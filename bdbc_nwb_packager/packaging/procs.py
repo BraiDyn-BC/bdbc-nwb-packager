@@ -98,12 +98,15 @@ def package_nwb(
     )
     nwbfile = configure_nwb_file(metadata)
 
-    # raw DAQ data (incl. trials)
+    # raw DAQ data
     timebases = _core.load_timebases(metadata, paths.source.rawdata)
-    trials = _trials.load_trials(paths.source.rawdata, timebases)
-    _trials.write_trials(nwbfile, trials, verbose=verbose)
     for ts in _daq.iterate_raw_daq_recordings(metadata, paths.source.rawdata, timebases):
         nwbfile.add_acquisition(ts)
+
+    if paths.session.type == 'task':
+        # add trials
+        trials = _trials.load_trials(paths.source.rawdata, timebases)
+        _trials.write_trials(nwbfile, trials, verbose=verbose)
 
     # downsampled DAQ data
     ds = nwbfile.create_processing_module(

@@ -167,11 +167,15 @@ class matcher:
         else:
             mapping = dict(ss='sensory-stim', rest='resting-state')
             refs = tuple(item.strip() for item in ref.split(','))
+            norm = []
             for ref in refs:
                 if ref in mapping.keys():
-                    ref = mappping[ref]
+                    ref = mapping[ref]
                 if ref not in ('task', 'resting-state', 'sensory-stim'):
                     raise ValueError(f"expected one of ('task', 'resting-state', 'sensory-stim'), got '{ref}'")
+                norm.append(ref)
+            refs = tuple(norm)
+
             def match(query: str) -> bool:
                 return (query in refs)
             return match
