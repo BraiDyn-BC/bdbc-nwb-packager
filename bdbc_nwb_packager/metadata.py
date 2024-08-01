@@ -32,6 +32,9 @@ import numpy.typing as _npt
 import h5py as _h5
 import pandas as _pd
 
+import bdbc_session_explorer as _sessx
+
+
 PathLike = Union[str, Path]
 
 
@@ -53,35 +56,31 @@ class SessionMetadata(_namedtuple('SessionMetadata', (
     'start_time',
     'lab',
     'institution',
+    'notes',
 ))):
-    SESSION_TYPES = {
-        'task': 'task',
-        'rest': 'resting-state',
-        'ss': 'sensory-stim',
-    }
     
     @classmethod
     def from_dict(
         cls,
         dct: Dict[str, Any],
-        session_type: str = 'task',
     ) -> Self:
+        sesstype = dct['session_type']
         desc = dct['session_description']
+        notes = dct['session_notes']
         start = _datetime.strptime(
             dct['session_start_time'], "%Y/%m/%d %H:%M:%S"
         ).astimezone(None)  # assumes local timezone
         exper = dct['experimenter']
         lab = dct['lab']
         inst = dct['institution']
-        if session_type in cls.SESSION_TYPES.keys():
-            session_type = cls.SESSION_TYPES[session_type]
         return cls(
-            session_type=session_type,
+            session_type=sesstype,
             description=desc,
             experimenter=exper,
             start_time=start,
             lab=lab,
             institution=inst,
+            notes=notes,
         )
 
 
@@ -270,11 +269,18 @@ class SingleROIMetadata(_namedtuple('SingleROIMetadata', (
         return f"SingleROIMetadata(name='{self.name}', ...)"
 
 
-def metadata_from_rawdata(rawfile: PathLike, session_type: str = 'task') -> Metadata:
+def metadata_from_rawdata(
+    session: _sessx.Session,
+    rawfile: PathLike,
+) -> Metadata:
     basedict = read_metadata_as_dict(rawfile)
+    # overwrite session metadata using `session`
+    basedict['session_description'] = session.description
+    basedict['session_notes'] = session.comments
+    basedict['session_type']  = session.type
     return Metadata(
         basedict=basedict,
-        session=SessionMetadata.from_dict(basedict, session_type=session_type),
+        session=SessionMetadata.from_dict(basedict),
         subject=SubjectMetadata.from_dict(basedict),
         task=TaskRecordingMetadata.from_dict(basedict),
         imaging=ImagingMetadata.from_dict(basedict),

@@ -29,9 +29,15 @@ import sys as _sys
 import os as _os
 import warnings as _warnings
 
-import session_explorer as _sessx
+import bdbc_session_explorer as _sessx
+
+from . import (
+    stdio as _stdio,
+)
+
 
 PathLike = Union[str, Path]
+PathsLike = Union[PathLike, Iterable[PathLike]]
 PATHSEP  = ':'
 
 
@@ -42,7 +48,7 @@ class PathSettings(_namedtuple('PathSettings', (
     'destination',
 ))):
     def has_behavior_videos(self) -> bool:
-        return self.source.videos.is_not_empty()
+        return self.session.has_any_videos()
 
 
 class SourcePaths(_namedtuple('SourcePaths', (
@@ -123,6 +129,10 @@ def dlc_model_dir(view: str, root: Optional[PathLike] = None) -> Path:
     )
 
 
+def sessions_root_dir(root: Optional[PathLike] = None) -> Path:
+    return ensure_root_dir(name='sessionroot', envname='SESSIONS_ROOT_DIR', root=root)
+
+
 def mesoscaler_root_dir(root: Optional[PathLike] = None) -> Path:
     return ensure_root_dir(name='mesoroot', envname='MESOSCALER_ROOT_DIR', root=root)
 
@@ -157,17 +167,19 @@ def rawdata_root_dirs(rootdirs: Optional[Iterable[PathLike]] = None) -> Tuple[Pa
 
 def setup_source_paths(
     session: _sessx.Session,
-    rawfile: Path,
+    rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
     mesoroot: Optional[PathLike] = None,
     dlcroot: Optional[PathLike] = None,
     pupilroot: Optional[PathLike] = None,
 ) -> SourcePaths:
+    rawroot   = rawdata_root_dirs(rawroot)
     videoroot = videos_root_dir(videoroot)
     mesoroot  = mesoscaler_root_dir(mesoroot)
     dlcroot   = dlcresults_root_dir(dlcroot)
     pupilroot = pupilfitting_root_dir(pupilroot)
     
+    rawfile  = _sessx.locate_rawdata_file(session, rawroot)
     mesofile = _sessx.locate_mesoscaler_file(session, mesoroot=mesoroot)
     if not mesofile.exists():
         raise FileNotFoundError(str(mesofile))
@@ -199,7 +211,7 @@ def setup_destination_paths(
 ) -> DestinationPaths:
     nwbroot = publication_root_dir(nwbroot)
     animal   = session.escaped_animal
-    sessname = f"{animal}_{session.longdate}_{session.longtype}"
+    sessname = f"{animal}_{session.longdate}_{session.longtype}-{session.longday}"
     sessdir  = nwbroot / animal / sessname
     nwbfile  = sessdir / f"{sessname}.nwb"
     imgdir   = sessdir / 'imaging'
@@ -230,7 +242,8 @@ def setup_model_configs(
 
 
 def setup_path_settings(
-    rawdata: _sessx.RawData,
+    session: _sessx.Session,
+    rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
     mesoroot: Optional[PathLike] = None,
     dlcroot: Optional[PathLike] = None,
@@ -239,11 +252,12 @@ def setup_path_settings(
     bodymodeldir: Optional[PathLike] = None,
     facemodeldir: Optional[PathLike] = None,
     eyemodeldir: Optional[PathLike] = None,
-) -> PathSettings:
-    session = rawdata.session
+) -> Optional[PathSettings]:
+    if not session.has_rawdata():
+        return None
     source  = setup_source_paths(
         session,
-        rawfile=rawdata.path,
+        rawroot=rawroot,
         videoroot=videoroot,
         mesoroot=mesoroot,
         dlcroot=dlcroot,
@@ -264,3 +278,4 @@ def setup_path_settings(
         dlc_configs=dlc_configs,
         destination=dest,
     )
+

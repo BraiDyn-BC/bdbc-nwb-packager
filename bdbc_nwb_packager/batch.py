@@ -26,20 +26,16 @@ from datetime import datetime as _datetime
 from time import time as _now
 import sys as _sys
 
-import session_explorer as _sessx
+import bdbc_session_explorer as _sessx
 
 from . import (
+    stdio as _stdio,
     paths as _paths,
     packaging as _packaging,
 )
 
 PathLike = Union[str, Path]
 PathsLike = Union[PathLike, Iterable[PathLike]]
-
-
-def _message(msg: str, end: str = '\n', verbose: bool = True):
-    if verbose:
-        print(msg, end=end, file=_sys.stderr, flush=True)
 
 
 def run_batch(
@@ -49,6 +45,7 @@ def run_batch(
     type: Optional[str] = None,
     overwrite: bool = False,
     verbose: bool = True,
+    sessroot: Optional[PathLike] = None,
     rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
     mesoroot: Optional[PathLike] = None,
@@ -59,20 +56,21 @@ def run_batch(
     face_model_dir: Optional[PathLike] = None,
     eye_model_dir: Optional[PathLike] = None,
 ):
-    for rawdata in filter_sessions(
+    for sess in filter_sessions(
         animal=animal,
         fromdate=fromdate,
         todate=todate,
         type=type,
-        raw_root_dirs=rawroot,
+        sessions_root_dir=sessroot,
     ):
-        sess = rawdata.session
-        rawfile = rawdata.path
-        _message(f"[{sess.batch}/{sess.animal} {sess.date} ({sess.type})]", verbose=verbose)
-        _message(f"raw data file: '{rawfile}'", verbose=verbose)
+        _stdio.message(f"[{sess.batch}/{sess.animal} {sess.longdate} ({sess.longtype})]", verbose=verbose)
+        if not sess.has_rawdata():
+            _stdio.message(f"***no raw data file", end='\n\n', verbose=verbose)
+            continue
         start = _now()
         paths = _paths.setup_path_settings(
-            rawdata,
+            session=sess,
+            rawroot=rawroot,
             videoroot=videoroot,
             mesoroot=mesoroot,
             dlcroot=dlcroot,
@@ -88,7 +86,7 @@ def run_batch(
             verbose=verbose,
         )
         stop = _now()
-        _message(
+        _stdio.message(
             f"(took {(stop - start) / 60:.1f} min to process this session)",
             end='\n\n',
             verbose=verbose
@@ -100,8 +98,8 @@ def filter_sessions(
     fromdate: Optional[str] = None,
     todate: Optional[str] = None,
     type: Optional[str] = None,
-    raw_root_dirs: Optional[PathsLike] = None,
-) -> Generator[_sessx.RawData, None, None]:
+    sessions_root_dir: Optional[PathLike] = None,
+) -> Generator[_sessx.Session, None, None]:
     is_animal = matcher.animal(animal)
     is_date = matcher.date(from_date=fromdate, to_date=todate)
     is_type = matcher.session_type(type)
@@ -109,9 +107,9 @@ def filter_sessions(
     def _matches(session: _sessx.Session) -> bool:
         return is_animal(session.animal) and is_date(session.date) and is_type(session.type)
     
-    raw_root_dirs = _paths.rawdata_root_dirs(raw_root_dirs)
-    for rawroot in raw_root_dirs:
-        yield from (raw for raw in _sessx.iterate_rawdata(rawroot) if _matches(raw.session))
+    sessions_root_dir = _paths.sessions_root_dir(sessions_root_dir)
+    yield from (sess for sess in _sessx.iterate_sessions(sessions_root_dir) \
+            if _matches(sess))
 
 
 class matcher:    
@@ -156,8 +154,7 @@ class matcher:
     ) -> Callable[[str], bool]:
         from_date = matcher.from_date(from_date)
         to_date = matcher.to_date(to_date)
-        def match(query: str) -> bool:
-            query = _datetime.strptime(query, '%y%m%d')
+        def match(query: _datetime) -> bool:
             return from_date(query) and to_date(query)
         return match
         
@@ -168,10 +165,14 @@ class matcher:
         if ref is None:
             return matcher.matches_all
         else:
+            mapping = dict(ss='sensory-stim', rest='resting-state')
             refs = tuple(item.strip() for item in ref.split(','))
             for ref in refs:
-                if ref not in ('task', 'rest', 'ss'):
-                    raise ValueError(f"expected one of ('task', 'rest', 'ss'), got '{ref}'")
+                if ref in mapping.keys():
+                    ref = mappping[ref]
+                if ref not in ('task', 'resting-state', 'sensory-stim'):
+                    raise ValueError(f"expected one of ('task', 'resting-state', 'sensory-stim'), got '{ref}'")
             def match(query: str) -> bool:
                 return (query in refs)
             return match
+

@@ -33,6 +33,7 @@ from hdmf.build.warnings import (
 )
 
 from .. import (
+    stdio as _stdio,
     metadata as _metadata,
     paths as _paths,
 )
@@ -62,6 +63,7 @@ def configure_nwb_file(
         experimenter=metadata.session.experimenter,  # optional
         lab=metadata.session.lab,  # optional
         institution=metadata.session.institution,  # optional
+        notes=metadata.session.notes,  # optional
     )
     nwbfile.subject = _nwb.file.Subject(
         age=metadata.subject.age,
@@ -75,7 +77,7 @@ def configure_nwb_file(
         date_of_birth = _datetime.combine(metadata.subject.date_of_birth, _datetime.min.time()).astimezone(None),
         strain = metadata.subject.strain,
     )
-    _core.print_message("configured an NWB file.", verbose=verbose)
+    _stdio.message("configured an NWB file.", verbose=verbose)
     return nwbfile
 
 
@@ -86,11 +88,14 @@ def package_nwb(
 ) -> _nwb.NWBFile:
     outfile = paths.destination.nwb
     if outfile.exists() and (not overwrite):
-        _core.print_message(f"***file already exists: '{outfile}'", verbose=verbose)
+        _stdio.message(f"***file already exists: '{outfile}'", verbose=verbose)
         # FIXME: load the contents from the file to return
         return
     
-    metadata = _metadata.metadata_from_rawdata(paths.source.rawdata, session_type=paths.session.type)
+    metadata = _metadata.metadata_from_rawdata(
+        paths.session,
+        paths.source.rawdata,
+    )
     nwbfile = configure_nwb_file(metadata)
 
     # raw DAQ data (incl. trials)
@@ -168,5 +173,6 @@ def package_nwb(
         ) as out:
             out.write(nwbfile)
     
-    _core.print_message(f"saved NWB file to: '{outfile}'", verbose=verbose)
+    _stdio.message(f"saved NWB file to: '{outfile}'", verbose=verbose)
     return nwbfile
+
