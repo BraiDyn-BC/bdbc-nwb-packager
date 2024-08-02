@@ -181,7 +181,7 @@ def setup_source_paths(
     
     rawfile  = _sessx.locate_rawdata_file(session, rawroot)
     mesofile = _sessx.locate_mesoscaler_file(session, mesoroot=mesoroot)
-    if not mesofile.exists():
+    if (mesofile is None) or (not mesofile.exists()):
         raise FileNotFoundError(str(mesofile))
     videos = _sessx.video_files_from_session(
         session,
@@ -193,7 +193,7 @@ def setup_source_paths(
     #   run DeepLabCut in case any of the output is missing?
     
     pupfile  = _sessx.locate_pupil_file(session, pupilroot=pupilroot)
-    if not pupfile.exists():
+    if (pupfile is None) or (not pupfile.exists()):
         # TODO: probably run fit_pupil?
         _sessx.core.message(f"***pupil file not found: {str(pupfile)}", verbose=True)
     return SourcePaths(

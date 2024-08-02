@@ -73,6 +73,7 @@ def write_videos(
         dstpath = getattr(paths.destination.videos, view)
         if srcpath is None:
             _core.print_message(f"***skipping {view} video: video file does not exist", verbose=verbose)
+            entries[view] = None
             continue
         if not dstpath.parent.exists():
             dstpath.parent.mkdir(parents=True)

@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Optional, Generator, Callable, Union, Iterable
+from typing import Optional, Generator, Callable, Union, Iterable, Dict, Any
 from pathlib import Path
 from datetime import datetime as _datetime
 from time import time as _now
@@ -43,6 +43,7 @@ def run_batch(
     fromdate: Optional[str] = None,
     todate: Optional[str] = None,
     type: Optional[str] = None,
+    override_metadata: Optional[str] = None,
     overwrite: bool = False,
     verbose: bool = True,
     sessroot: Optional[PathLike] = None,
@@ -56,6 +57,8 @@ def run_batch(
     face_model_dir: Optional[PathLike] = None,
     eye_model_dir: Optional[PathLike] = None,
 ):
+    override_metadata = parse_overridden_metadata(override_metadata)
+
     for sess in filter_sessions(
         animal=animal,
         fromdate=fromdate,
@@ -82,6 +85,7 @@ def run_batch(
         )
         _packaging.package_nwb(
             paths=paths,
+            override_metadata=override_metadata,
             overwrite=overwrite,
             verbose=verbose,
         )
@@ -91,6 +95,41 @@ def run_batch(
             end='\n\n',
             verbose=verbose
         )
+
+
+def parse_overridden_metadata(spec: Optional[str]) -> Optional[Dict[str, Any]]:
+    def _as_int(v) -> Optional[int]:
+        try:
+            return int(v)
+        except ValueError:
+            return None
+    def _as_float(v) -> Optional[float]:
+        try:
+            return float(v)
+        except ValueError:
+            return None
+    def _normalize(v: str) -> Union[str, int, float]:
+        if (iv := _as_int(v)) is not None:
+            return iv
+        elif (fv := _as_float(v)) is not None:
+            return fv
+        else:
+            return v
+    if spec is None:
+        return None
+    rawspecs = tuple(item.strip() for item in spec.split(',') if len(item) > 0)
+    if len(rawspecs) == 0:
+        return None
+    specs = []
+    for rawspec in rawspecs:
+        if len(rawspec) == 0:
+            continue
+        elif '=' not in rawspec:
+            _stdio.message("***unknown format for metadata spec: '{rawspec}'", verbose=True)
+            continue
+        fld, rawval = tuple(item.strip() for item in rawspec.split('='))
+        specs.append((fld, _normalize(rawval)))
+    return dict(specs)
 
 
 def filter_sessions(

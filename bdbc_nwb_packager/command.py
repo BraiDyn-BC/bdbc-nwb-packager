@@ -50,6 +50,12 @@ parser.add_argument(
     help="specifies the type (or types, in a comma-separated list) of the sessions to be processed: must be one of ('task', 'rest', 'ss')"
 )
 parser.add_argument(
+    '-m' '--metadata',
+    default=None,
+    dest='override_metadata',
+    help="comma-separated metadata entries, in a 'field=value' format, to override entries in the raw-data files",
+)
+parser.add_argument(
     '-f', '--force',
     action='store_true',
     dest='overwrite',

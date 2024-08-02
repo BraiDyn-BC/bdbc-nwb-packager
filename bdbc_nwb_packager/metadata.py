@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Tuple, Union, Optional
 from typing_extensions import Self
 from pathlib import Path
 from collections import namedtuple as _namedtuple
@@ -34,13 +34,17 @@ import pandas as _pd
 
 import bdbc_session_explorer as _sessx
 
+from . import (
+    stdio as _stdio,
+)
+
 
 PathLike = Union[str, Path]
 
 
-def _message(msg: str, end: str = '\n', verbose: bool = True):
-    if verbose:
-        print(msg, end=end, file=_sys.stderr, flush=True)
+class MetadataParseError(ValueError):
+    def __init__(self, msg):
+        super().__init__(msg)
 
 
 class Metadata(_namedtuple('Metadata', ('basedict', 'session', 'subject', 'task', 'imaging', 'videos'))):
@@ -67,9 +71,17 @@ class SessionMetadata(_namedtuple('SessionMetadata', (
         sesstype = dct['session_type']
         desc = dct['session_description']
         notes = dct['session_notes']
-        start = _datetime.strptime(
-            dct['session_start_time'], "%Y/%m/%d %H:%M:%S"
-        ).astimezone(None)  # assumes local timezone
+        try:
+            start = _datetime.strptime(
+                dct['session_start_time'], "%Y/%m/%d %H:%M:%S"
+            ).astimezone(None)  # assumes local timezone
+        except ValueError:
+            start = None
+        if start is None:
+            print(dct)
+            raise MetadataParseError(
+                f"failed to parse session start time: '{dct['session_start_time']}'"
+            )
         exper = dct['experimenter']
         lab = dct['lab']
         inst = dct['institution']
@@ -109,9 +121,17 @@ class SubjectMetadata(_namedtuple('SubjectMetadata', (
         strain = dct['strain']
         genotype = dct['genotype']
         sex = dct['sex']
-        DoB = _datetime.strptime(
-            dct['date_of_birth'], "%Y-%m-%d"
-        ).astimezone(None)  # assumes local timezone
+        try:
+            DoB = _datetime.strptime(
+                dct['date_of_birth'], "%Y-%m-%d"
+            ).astimezone(None)  # assumes local timezone
+        except ValueError:
+            DoB = None
+        if DoB is None:
+            print(dct)
+            raise MetadataParseError(
+                f"failed to parse subject DoB: '{dct['date_of_birth']}'"
+            )
         age = dct['age']
         baseweight = dct['baseweight']
         weight = dct['weight']
@@ -272,12 +292,15 @@ class SingleROIMetadata(_namedtuple('SingleROIMetadata', (
 def metadata_from_rawdata(
     session: _sessx.Session,
     rawfile: PathLike,
+    override: Optional[Dict[str, Any]] = None,
 ) -> Metadata:
     basedict = read_metadata_as_dict(rawfile)
     # overwrite session metadata using `session`
     basedict['session_description'] = session.description
     basedict['session_notes'] = session.comments
     basedict['session_type']  = session.type
+    if override is not None:
+        basedict.update(override)
     return Metadata(
         basedict=basedict,
         session=SessionMetadata.from_dict(basedict),
@@ -363,7 +386,7 @@ def read_roi_metadata(
                     description=f"{group[name].attrs['description']}, {side} hemisphere",
                 )
                 rois.append(roi)
-        _message(f"read {len(rois)} ROIs from the mesoscaler registration file.", verbose=verbose)
+        _stdio.message(f"read {len(rois)} ROIs from the mesoscaler registration file.", verbose=verbose)
         return ROISetMetadata(
             transform=trans,
             rois=tuple(rois),

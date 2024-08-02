@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import Optional, Dict, Any
 from uuid import uuid4 as _uuid4
 from datetime import datetime as _datetime
 import warnings as _warnings
@@ -83,6 +84,7 @@ def configure_nwb_file(
 
 def package_nwb(
     paths: _paths.PathSettings,
+    override_metadata: Optional[Dict[str, None]] = None,
     overwrite: bool = False,
     verbose: bool = True,
 ) -> _nwb.NWBFile:
@@ -95,6 +97,7 @@ def package_nwb(
     metadata = _metadata.metadata_from_rawdata(
         paths.session,
         paths.source.rawdata,
+        override=override_metadata,
     )
     nwbfile = configure_nwb_file(metadata)
 
