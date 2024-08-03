@@ -26,6 +26,8 @@ from time import time as _now
 from uuid import uuid4 as _uuid4
 import warnings as _warnings
 
+import numpy as _np
+import pandas as _pd
 from pynwb import (
     NWBFile as _NWBFile,
 )
@@ -39,9 +41,11 @@ from ndx_pose import (
 
 from .. import (
     paths as _paths,
+    stdio as _stdio,
 )
 from . import (
     core as _core,
+    videos as _videos,
 )
 
 PathLike = _core.PathLike
@@ -54,90 +58,94 @@ NAME_MAPPINGS = {
 
 
 def iterate_pose_estimations(
-    nwbfile: _NWBFile,
-    timebases: _core.Timebases,
     paths: _paths.PathSettings,
+    timebases: _core.Timebases,
+    mismatch_tolerance: int = 1,
     verbose: bool = True,
-) -> Generator[_PoseEstimation, None, None]:
-    #
-    # IMPLEMENTATION NOTE:
-    #
-    # Here we convert each interface once to a temporal NWB file,
-    # then copy its contents to the main NWB file with renamed PoseEstimation
-    # (though it is admittedly hacky and complicated...)
-    #
-    # Probably it would be better instead to directly read from
-    # the DeepLabCut output file to create a PoseEstimation entry.
-    #
-    def _setup_temporal_nwb(view: str, target: str) -> _NWBFile:
-        entry = _DeepLabCutInterface(
-            file_path=getattr(paths.source.deeplabcut, view),
-            config_file_path=getattr(paths.dlc_configs, view),
-            subject_name=nwbfile.subject.subject_id,
-            verbose=True,
-        )
-        meta = entry.get_metadata()
-        meta["NWBFile"].update(session_start_time=nwbfile.session_start_time)
-        entry.set_aligned_timestamps(timebases.videos)
-        
-        # add to a "temporal" nwbfile
-        tempfile = _NWBFile(
-            session_description=f"{view}:{target}", 
-            identifier=str(_uuid4()),  # required
-            session_start_time=nwbfile.session_start_time,  # required
-            experimenter=[])
-        entry.add_to_nwbfile(nwbfile=tempfile, metadata=meta)
-        return tempfile
+) -> _PoseEstimation:
+    """load DeepLabCut results from corresponding HDF5 files,
+    and returns a generator iterating over PoseEstimation objects."""
 
-    def _setup_pose_estimation(tempfile: _NWBFile) -> _PoseEstimation:
-        keypoints = []
-        view, model = tempfile.session_description.split(':')
-        for kpt in tempfile.processing["behavior"]["PoseEstimation"].nodes:
-            data = tempfile.processing["behavior"]["PoseEstimation"][kpt].data
-            confidence = tempfile.processing["behavior"]["PoseEstimation"][kpt].confidence
-            keypoint = _PoseEstimationSeries(
-                name=f"{model}_{kpt}",
+    # TODO: this procedure must be (formally) during
+    # e.g. imaging/videos registration
+    def _setup_clips(num_frames, num_pulses):
+        """a temporary solution until sizes of timebases/videos are nicely handled."""
+        delta = num_frames - num_pulses
+        if delta == 0:
+            timeclip = slice(None, None)
+            videoclip = slice(None, None)
+        elif 0 < delta < mismatch_tolerarnce:
+            timeclip  = slice(None, None)
+            videoclip = slice(0, num_pulses)
+        elif (-1 * mismatch_tolerance) <= delta < 0:
+            timeclip = slice(0, num_frames)
+            videoclip = slice(None, None)
+        else:
+            raise RuntimeError(f"untolerable mismatch: {num_pulses} pulses vs {num_frames} frames")
+        return timeclip, videoclip
+
+    _stdio.message('registering DeepLabCut:', end=' ', verbose=verbose)
+    destvideos = paths.destination.videos.relative_to(paths.destination.session_dir)
+    for view, model in NAME_MAPPINGS.items():
+        srcvideo = getattr(paths.source.videos, view)
+        # TODO: handle cases with `srcvideo.path is None`
+        if srcvideo.path is None:
+            _stdio.message(
+                f"***missing the {view} video...",
+                end=' ',
+                verbose=verbose
+            )
+            continue
+        tclip, vclip = _setup_clips(srcvideo.num_frames, timebases.videos.size)
+        
+        dlcpath = getattr(paths.source.deeplabcut, view)
+        if dlcpath is None:
+            _stdio.message(
+                f"***missing the {view} model results...",
+                end=' ',
+                verbose=verbose
+            )
+            continue
+        dlctab = _pd.read_hdf(dlcpath, key='df_with_missing')
+        scorer = dlctab.columns[0][0]
+        dlctab = dlctab.iloc[vclip]
+        t = timebases.videos[tclip]
+        assert dlctab.shape[0] == t.size
+
+        _stdio.message(f"{view} model...", end=' ', verbose=verbose)
+        series = []
+        keypoints = tuple(set(col[1] for col in dlctab.columns))
+        
+        # TODO: think over about what names may be appropriate
+        pose_estimation_name = f"{view}_video_keypoints"
+        node_names = [f"{kpt}" for kpt in keypoints]
+        for kpt, node_name in zip(keypoints, node_names):
+            data = _np.stack([
+                dlctab[scorer, kpt, 'x'].values,
+                dlctab[scorer, kpt, 'y'].values
+            ], axis=1)
+            series.append(_PoseEstimationSeries(
+                name=node_name,
                 description=f"Keypoint '{kpt}' from the {view} video.",
                 data=data,
-                unit="pixels",
+                unit='pixels',
                 reference_frame="(0,0) corresponds to the top left corner of the video.",
-                timestamps=timebases.videos,
-                confidence=confidence,
+                timestamps=t,
+                confidence=_np.array(dlctab[scorer, kpt, 'likelihood'].values),
                 confidence_definition="Softmax output of the deep neural network.",
-            )
-            keypoints.append(keypoint)
-            
-        pose = _PoseEstimation(
-            name=f"PoseEstimation_{model}",
-            pose_estimation_series = keypoints,
-            original_videos=tempfile.processing["behavior"]["PoseEstimation"].original_videos,
-            dimensions=tempfile.processing["behavior"]["PoseEstimation"].dimensions,
-            scorer=tempfile.processing["behavior"]["PoseEstimation"].scorer,
+            ))
+        yield _PoseEstimation(
+            name=pose_estimation_name,
+            description=f"Estimated positions of keypoints from the {view} view frames using DeepLabCut.",
+            pose_estimation_series=series,
+            nodes=node_names,
+            original_videos=[str(getattr(destvideos, view))],
+            labeled_videos=[],
+            dimensions=_np.array(
+                [[srcvideo.width, srcvideo.height]], dtype=_np.uint16,
+            ),  # pixel dimensions of the video
+            scorer=scorer,
             source_software="DeepLabCut",
-            nodes=tempfile.processing["behavior"]["PoseEstimation"].nodes,
+            source_software_version="2.3.10",
         )
-        videopath = getattr(paths.destination.videos.relative_to(paths.destination.session_dir), view)
-        pose.fields['original_videos'] = str(videopath)
-        return pose
 
-    _core.print_message('registering DeepLabCut:', end=' ', verbose=verbose)
-    start = _now()
-    with _warnings.catch_warnings():
-        # ignore warnings: about :
-        # - 'model metadata'
-        # - 'associated video' (later set in _setup_pose_estimation())
-        # - pandas.DataFrame.groupby() with axis=1
-        #
-        _warnings.filterwarnings('ignore', category=UserWarning, message='Metadata')
-        _warnings.filterwarnings('ignore', category=UserWarning, message='The video file corresponding to')
-        _warnings.filterwarnings('ignore', category=FutureWarning, message='DataFrame.groupby with axis=1')
-        for view, model in NAME_MAPPINGS.items():
-            if getattr(paths.source.deeplabcut, view) is None:
-                # FIXME: make up empty PoseEstimation?
-                _core.print_message(f"***missing the {view} model results", verbose=verbose)
-                continue
-            _core.print_message(f"{view} model...", end=' ', verbose=verbose)
-            tempfile = _setup_temporal_nwb(view, model)
-            yield _setup_pose_estimation(tempfile)
-    stop = _now()
-    _core.print_message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
