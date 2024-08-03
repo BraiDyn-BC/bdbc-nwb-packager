@@ -28,6 +28,7 @@ from pynwb import NWBFile as _NWBFile
 from pynwb.image import ImageSeries as _ImageSeries
 
 from .. import (
+    stdio as _stdio,
     paths as _paths,
     metadata as _metadata,
 )
@@ -56,6 +57,7 @@ def write_videos(
     metadata: _metadata.Metadata,
     timebases: _core.Timebases,
     paths: _paths.PathSettings,
+    copy_files: bool = True,
     verbose: bool = True,
 ) -> VideoEntries:
     
@@ -69,20 +71,23 @@ def write_videos(
     
     entries = dict()
     for view in VideoEntries._fields:
-        srcpath = getattr(paths.source.videos, view)
-        dstpath = getattr(paths.destination.videos, view)
+        srcpath = getattr(paths.source.videos, view).path
+        dstpath = getattr(paths.destination.videos, view)  # note no need of 'path'
         if srcpath is None:
-            _core.print_message(f"***skipping {view} video: video file does not exist", verbose=verbose)
+            _stdio.message(f"***skipping {view} video: video file does not exist", verbose=verbose)
             entries[view] = None
             continue
         if not dstpath.parent.exists():
             dstpath.parent.mkdir(parents=True)
         
-        _core.print_message(f"copying {view} video...", end=' ', verbose=verbose)
-        start = _now()
-        _shutil.copy(srcpath, dstpath)
-        stop = _now()
-        _core.print_message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+        if copy_files:
+            _stdio.message(f"copying {view} video...", end=' ', verbose=verbose)
+            start = _now()
+            _shutil.copy(srcpath, dstpath)
+            stop = _now()
+            _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+        else:
+            _stdio.message(f"***skip copying {view} video", verbose=verbose)
 
         desc = DESCRIPTION[view]
         entry = _ImageSeries(
@@ -98,5 +103,7 @@ def write_videos(
         nwbfile.add_acquisition(entry)
         entries[view] = entry
 
-    _core.print_message("done registering the video files.", verbose=verbose)
+    _stdio.message("done registering the video files.", verbose=verbose)
+
     return VideoEntries(**entries)
+

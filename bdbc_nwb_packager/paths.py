@@ -27,6 +27,7 @@ from collections import namedtuple as _namedtuple
 from datetime import datetime as _datetime
 import sys as _sys
 import os as _os
+import json as _json
 import warnings as _warnings
 
 import bdbc_session_explorer as _sessx
@@ -105,6 +106,20 @@ class VideoDataFiles(_namedtuple('VideoDataFiles', (
         )
 
 
+class VideoDataFile(_namedtuple('VideoDataFile', (
+    'path',
+    'width',
+    'height',
+    'num_frames',
+))):
+    @classmethod
+    def empty(cls) -> Self:
+        return cls(None, 0, 0, 0)
+
+    def relative_to(self, ref: Path) -> Self:
+        return self._replace(path=self.path.relative_to(ref))
+
+
 def warn_message(msg: str, end='\n'):
     print(msg, end=end, file=_sys.stderr, flush=True)
 
@@ -165,6 +180,22 @@ def rawdata_root_dirs(rootdirs: Optional[Iterable[PathLike]] = None) -> Tuple[Pa
         return tuple(Path(item) for item in rootdirs)
 
 
+def setup_video_file(
+    videofile: Optional[Path]
+) -> VideoDataFile:
+    if videofile is None:
+        return VideoDataFile.empty()
+    metapath = videofile.with_name(f"METADATA_{videofile.stem}.json")
+    with open(metapath, 'r') as src:
+        videometa = _json.load(src)
+    return VideoDataFile(
+        path=videofile,
+        width=videometa['width'],
+        height=videometa['height'],
+        num_frames=videometa['num_frames'],
+    )
+
+
 def setup_source_paths(
     session: _sessx.Session,
     rawroot: Optional[PathsLike] = None,
@@ -183,10 +214,15 @@ def setup_source_paths(
     mesofile = _sessx.locate_mesoscaler_file(session, mesoroot=mesoroot)
     if (mesofile is None) or (not mesofile.exists()):
         raise FileNotFoundError(str(mesofile))
-    videos = _sessx.video_files_from_session(
+    sessvideos = _sessx.video_files_from_session(
         session,
         videoroot=videoroot,
         error_handling='message',
+    )
+    videos = VideoDataFiles(
+        body=setup_video_file(sessvideos.body),
+        face=setup_video_file(sessvideos.face),
+        eye=setup_video_file(sessvideos.eye),
     )
     dlcfiles = _sessx.dlc_output_files_from_session(session, dlcroot=dlcroot)
     # TODO:

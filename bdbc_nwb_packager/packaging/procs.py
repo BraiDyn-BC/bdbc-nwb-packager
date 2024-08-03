@@ -84,6 +84,9 @@ def configure_nwb_file(
 
 def package_nwb(
     paths: _paths.PathSettings,
+    copy_videos: bool = True,
+    register_rois: bool = True,
+    write_imaging_frames: bool = True,
     override_metadata: Optional[Dict[str, None]] = None,
     overwrite: bool = False,
     verbose: bool = True,
@@ -123,30 +126,40 @@ def package_nwb(
         metadata=metadata,
         timebases=timebases,
         paths=paths,
+        copy_files=copy_videos,
         verbose=verbose,
     )
 
     # imaging data
-    frames = _imaging.load_imaging_data(paths.source.rawdata, timebases=timebases, verbose=verbose)
+    frames = _imaging.load_imaging_data(
+        paths.source.rawdata,
+        timebases=timebases,
+        verbose=verbose
+    )
     setup  = _imaging.setup_imaging_device(metadata, nwbfile, verbose=verbose)
     _imaging.write_imaging_data(
         nwbfile=nwbfile, 
         destination=paths.destination,
         frames=frames,
         setup=setup,
+        write_frames=write_imaging_frames,
+        verbose=verbose,
     )
 
     # rois
-    fdata  = frames.flatten(verbose=verbose)
-    roimeta = _metadata.read_roi_metadata(paths.source.mesoscaler)
-    _rois.write_roi_entries(
-        nwbfile=nwbfile,
-        metadata=metadata,
-        roimeta=roimeta,
-        flattened_data=fdata,
-        setup=setup,
-        verbose=verbose,
-    )
+    if register_rois:
+        fdata  = frames.flatten(verbose=verbose)
+        roimeta = _metadata.read_roi_metadata(paths.source.mesoscaler)
+        _rois.write_roi_entries(
+            nwbfile=nwbfile,
+            metadata=metadata,
+            roimeta=roimeta,
+            flattened_data=fdata,
+            setup=setup,
+            verbose=verbose,
+        )
+    else:
+        _stdio.message('***skip registering ROI data', verbose=verbose)
 
     if paths.has_behavior_videos():
         # DLC results / pupil
@@ -154,9 +167,8 @@ def package_nwb(
             name="behavior", description="Processed behavioral data"
         )
         for pose in _dlc.iterate_pose_estimations(
-            nwbfile=nwbfile,
-            timebases=timebases,
             paths=paths,
+            timebases=timebases,
             verbose=verbose,
         ):
             behav.add(pose)
@@ -167,8 +179,10 @@ def package_nwb(
             verbose=verbose
         )
         if pupil is not None:
+            _stdio.message(f"registering pupil fitting...", end=' ', verbose=verbose)
             for tracking in pupil:
                 behav.add(tracking)
+            _stdio.message("done.", verbose=verbose)
 
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore', category=_DtypeConversionWarning)

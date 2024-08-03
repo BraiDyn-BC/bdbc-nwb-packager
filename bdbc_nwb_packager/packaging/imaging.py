@@ -34,6 +34,7 @@ from tifffile import TiffWriter as _TiffWriter
 from tqdm import tqdm as _tqdm
 
 from .. import (
+    stdio as _stdio,
     paths as _paths,
     metadata as _metadata,
 )
@@ -52,18 +53,18 @@ class ImagingData(_namedtuple('ImagingData', (
     def flatten(self, verbose: bool = True) -> Self:
         if self.B.ndim == 2:
             return self
-        _core.print_message("flattening", end=' ', verbose=verbose)
+        _stdio.message("flattening", end=' ', verbose=verbose)
         data = dict()
         start = _now()
         for fld in self._fields:
             if fld == 'time':
                 data[fld] = getattr(self, fld)
             else:
-                _core.print_message(f"{fld} frames...", end=' ', verbose=verbose)
+                _stdio.message(f"{fld} frames...", end=' ', verbose=verbose)
                 frames = getattr(self, fld)
                 data[fld] = frames.reshape((frames.shape[0], -1))
         stop = _now()
-        _core.print_message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
+        _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
         return self.__class__(**data)
 
 
@@ -83,12 +84,12 @@ def load_imaging_data(
 ) -> Dict[str, _npt.NDArray[_np.float32]]:
     with _h5.File(rawfile, 'r') as src:
         start = _now()
-        _core.print_message("reading B frames...", end=' ', verbose=verbose)
+        _stdio.message("reading B frames...", end=' ', verbose=verbose)
         im_B = _np.array(src["image/Ib"], dtype=_np.float32).transpose((0, 2, 1))  # (T, H, W)
-        _core.print_message("V frames...", end=' ', verbose=verbose)
+        _stdio.message("V frames...", end=' ', verbose=verbose)
         im_V = _np.array(src["image/Iv"], dtype=_np.float32).transpose((0, 2, 1))
         stop = _now()
-        _core.print_message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
+        _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
     return ImagingData(time=timebases, B=im_B, V=im_V)
 
 
@@ -140,7 +141,7 @@ def setup_imaging_device(
         origin_coords=[0.0, 0.0],
         origin_coords_unit="meters",
     )
-    _core.print_message("done configuring the imaging setup.", verbose=verbose)
+    _stdio.message("done configuring the imaging setup.", verbose=verbose)
     return NWBImagingSetup(
         device=device,
         acquisition=acq,
@@ -154,23 +155,27 @@ def write_imaging_data(
     destination: _paths.DestinationPaths,
     frames: ImagingData,
     setup: NWBImagingSetup,
+    write_frames: bool = True,
     verbose: bool = True,
 ):
     outfiles = destination.imaging
-    for chan in ('B', 'V'):
-        outfile = Path(getattr(outfiles, chan))
-        if not outfile.parent.exists():
-            outfile.parent.mkdir(parents=True)
-        data = getattr(frames, chan)
-        with _TiffWriter(str(outfile), bigtiff=True) as out:
-            rng = range(data.shape[0])
-            if verbose:
-                rng = _tqdm(rng, desc=f"writing {chan} frames")
-            for i in rng:
-                out.write(data[i], contiguous=True)
+    if write_frames:
+        for chan in ('B', 'V'):
+            outfile = Path(getattr(outfiles, chan))
+            if not outfile.parent.exists():
+                outfile.parent.mkdir(parents=True)
+            data = getattr(frames, chan)
+            with _TiffWriter(str(outfile), bigtiff=True) as out:
+                rng = range(data.shape[0])
+                if verbose:
+                    rng = _tqdm(rng, desc=f"writing {chan} frames")
+                for i in rng:
+                    out.write(data[i], contiguous=True)
+    else:
+        _stdio.message('***skip writing imaging frames', verbose=verbose)
 
     relfiles = outfiles.relative_to(destination.session_dir)
-    _core.print_message("adding channels to registry...", end=' ', verbose=verbose)
+    _stdio.message("adding channels to registry...", end=' ', verbose=verbose)
     start = _now()
     sig_B = _nwb.ophys.OnePhotonSeries(
         name = 'widefield_blue',
@@ -195,4 +200,5 @@ def write_imaging_data(
     nwbfile.add_acquisition(sig_B)
     nwbfile.add_acquisition(sig_V)
     stop = _now()
-    _core.print_message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+    _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+
