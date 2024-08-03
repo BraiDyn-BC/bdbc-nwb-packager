@@ -74,7 +74,7 @@ def iterate_pose_estimations(
         if delta == 0:
             timeclip = slice(None, None)
             videoclip = slice(None, None)
-        elif 0 < delta < mismatch_tolerarnce:
+        elif 0 < delta <= mismatch_tolerance:
             timeclip  = slice(None, None)
             videoclip = slice(0, num_pulses)
         elif (-1 * mismatch_tolerance) <= delta < 0:
