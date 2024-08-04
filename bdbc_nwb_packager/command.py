@@ -50,6 +50,30 @@ parser.add_argument(
     help="specifies the type (or types, in a comma-separated list) of the sessions to be processed: must be one of ('task', 'rest', 'ss')"
 )
 parser.add_argument(
+    '--no-write-videos',
+    action='store_false',
+    dest='copy_videos',
+    help='suppresses copying of videos to the publication directory',
+)
+parser.add_argument(
+    '--no-write-imaging',
+    action='store_false',
+    dest='write_imaging_frames',
+    help='suppresses writing out imaging frames to the publication directory',
+)
+parser.add_argument(
+    '--no-write-rois',
+    action='store_false',
+    dest='register_rois',
+    help='suppresses registration and calculation of ROI dF/F',
+)
+parser.add_argument(
+    '--no-downsampled-data',
+    action='store_false',
+    dest='add_downsampled',
+    help='suppresses generation and registration of downsampled data',
+)
+parser.add_argument(
     '-m' '--metadata',
     default=None,
     dest='override_metadata',
@@ -75,3 +99,4 @@ def batch_package_nwb(args=None):
     else:
         specs = vars(parser.parse_args(args))
     _batch.run_batch(**specs)
+

@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Union, Dict
+from typing import Tuple
 from pathlib import Path
 from collections import namedtuple as _namedtuple
 import sys as _sys
@@ -31,9 +31,10 @@ import h5py as _h5
 
 from .. import (
     metadata as _metadata,
+    paths as _paths,
 )
 
-PathLike = Union[str, Path]
+PathLike = _paths.PathLike
 
 
 class Timebases(_namedtuple('Timebases', (
@@ -48,6 +49,28 @@ class Timebases(_namedtuple('Timebases', (
         return self.B
 
 
+class PulseTriggers(_namedtuple('PulseTriggers', (
+    'videos',
+    'B',
+    'V',
+))):
+    @property
+    def dFF(self) -> _npt.NDArray[_np.integer]:
+        """the pulse triggers for hemodynamics-corrected signals"""
+        return self.B
+
+    def as_timebases(
+        self,
+        ref: _npt.NDArray[_np.floating]
+    ) -> _npt.NDArray[_np.floating]:
+        return Timebases(
+            raw=ref,
+            videos=ref[self.videos] if self.videos is not None else None,
+            B=ref[self.B],
+            V=ref[self.V],
+        )
+
+
 def print_message(msg: str, end: str = '\n', verbose: bool = True):
     if verbose:
         print(msg, end=end, file=_sys.stderr, flush=True)
@@ -57,14 +80,18 @@ def load_timebases(
     metadata: _metadata.Metadata,
     rawfile: PathLike,
     verbose: bool = True,
-) -> Dict[str, _npt.NDArray]:
+) -> Tuple[PulseTriggers, Timebases]:
     with _h5.File(rawfile, 'r') as src:
         sizB = src['image/Ib'].shape[0]
         sizV = src['image/Iv'].shape[0]
 
-        # NOTE: indexing is in the MATLAB format: need to subtract 1 to convert to the Python format
-        # video triggers
-        videos = _np.array(src["sync_pulse/vid_acq"], dtype=_np.uint32).ravel() - 1        
+        # NOTE: indexing is in the MATLAB format:
+        # need to subtract 1 to convert to the Python format indices
+        if 'vid_acq' in src['sync_pulse'].keys():
+            videos = _np.array(src["sync_pulse/vid_acq"], dtype=_np.uint32).ravel() - 1 
+        else:
+            videos = None
+        
         # imaging pulses
         img_raw = _np.array(src["sync_pulse/img_acq"], dtype=_np.uint32).ravel() - 1
         if img_raw.size % 2 != 0:
@@ -82,4 +109,10 @@ def load_timebases(
 
         print_message("done loading time bases.", verbose=verbose)
         
-        return Timebases(raw=raw_t, videos=raw_t[videos], B=raw_t[pulseB], V=raw_t[pulseV])
+        trigs = PulseTriggers(
+            videos=videos,
+            B=pulseB,
+            V=pulseV,
+        )
+        return trigs, trigs.as_timebases(raw_t)
+

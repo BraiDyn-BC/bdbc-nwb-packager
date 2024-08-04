@@ -80,16 +80,21 @@ class NWBImagingSetup(_namedtuple('NWBImagingSetup', (
 def load_imaging_data(
     rawfile: PathLike,
     timebases: _core.Timebases,
+    read_frames: bool = True,
     verbose: bool = True
 ) -> Dict[str, _npt.NDArray[_np.float32]]:
-    with _h5.File(rawfile, 'r') as src:
-        start = _now()
-        _stdio.message("reading B frames...", end=' ', verbose=verbose)
-        im_B = _np.array(src["image/Ib"], dtype=_np.float32).transpose((0, 2, 1))  # (T, H, W)
-        _stdio.message("V frames...", end=' ', verbose=verbose)
-        im_V = _np.array(src["image/Iv"], dtype=_np.float32).transpose((0, 2, 1))
-        stop = _now()
-        _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
+    if read_frames:
+        with _h5.File(rawfile, 'r') as src:
+            start = _now()
+            _stdio.message("reading B frames...", end=' ', verbose=verbose)
+            im_B = _np.array(src["image/Ib"], dtype=_np.float32).transpose((0, 2, 1))  # (T, H, W)
+            _stdio.message("V frames...", end=' ', verbose=verbose)
+            im_V = _np.array(src["image/Iv"], dtype=_np.float32).transpose((0, 2, 1))
+            stop = _now()
+            _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
+    else:
+        im_B = None,
+        im_V = None,
     return ImagingData(time=timebases, B=im_B, V=im_V)
 
 

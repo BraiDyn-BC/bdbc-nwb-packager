@@ -20,13 +20,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Generator
+from typing import Generator, Optional
 from collections import namedtuple as _namedtuple
 from time import time as _now
 from uuid import uuid4 as _uuid4
 import warnings as _warnings
 
 import numpy as _np
+import numpy.typing as _npt
 import pandas as _pd
 from pynwb import (
     NWBFile as _NWBFile,
@@ -40,8 +41,10 @@ from ndx_pose import (
 )
 
 from .. import (
-    paths as _paths,
     stdio as _stdio,
+    paths as _paths,
+    validation as _validation,
+    alignment as _alignment,
 )
 from . import (
     core as _core,
@@ -60,35 +63,22 @@ NAME_MAPPINGS = {
 def iterate_pose_estimations(
     paths: _paths.PathSettings,
     timebases: _core.Timebases,
+    triggers: Optional[_core.PulseTriggers] = None,
     mismatch_tolerance: int = 1,
+    downsample: bool = False,
     verbose: bool = True,
 ) -> _PoseEstimation:
     """load DeepLabCut results from corresponding HDF5 files,
     and returns a generator iterating over PoseEstimation objects."""
 
-    # TODO: this procedure must be (formally) during
-    # e.g. imaging/videos registration
-    def _setup_clips(num_frames, num_pulses):
-        """a temporary solution until sizes of timebases/videos are nicely handled."""
-        delta = num_frames - num_pulses
-        if delta == 0:
-            timeclip = slice(None, None)
-            videoclip = slice(None, None)
-        elif 0 < delta <= mismatch_tolerance:
-            timeclip  = slice(None, None)
-            videoclip = slice(0, num_pulses)
-        elif (-1 * mismatch_tolerance) <= delta < 0:
-            timeclip = slice(0, num_frames)
-            videoclip = slice(None, None)
-        else:
-            raise RuntimeError(f"untolerable mismatch: {num_pulses} pulses vs {num_frames} frames")
-        return timeclip, videoclip
+    if downsample:
+        _stdio.message('registering downsampled DeepLabCut:', end=' ', verbose=verbose)
+    else:
+        _stdio.message('registering DeepLabCut:', end=' ', verbose=verbose)
 
-    _stdio.message('registering DeepLabCut:', end=' ', verbose=verbose)
     destvideos = paths.destination.videos.relative_to(paths.destination.session_dir)
     for view, model in NAME_MAPPINGS.items():
         srcvideo = getattr(paths.source.videos, view)
-        # TODO: handle cases with `srcvideo.path is None`
         if srcvideo.path is None:
             _stdio.message(
                 f"***missing the {view} video...",
@@ -96,8 +86,6 @@ def iterate_pose_estimations(
                 verbose=verbose
             )
             continue
-        tclip, vclip = _setup_clips(srcvideo.num_frames, timebases.videos.size)
-        
         dlcpath = getattr(paths.source.deeplabcut, view)
         if dlcpath is None:
             _stdio.message(
@@ -106,24 +94,56 @@ def iterate_pose_estimations(
                 verbose=verbose
             )
             continue
-        dlctab = _pd.read_hdf(dlcpath, key='df_with_missing')
-        scorer = dlctab.columns[0][0]
-        dlctab = dlctab.iloc[vclip]
-        t = timebases.videos[tclip]
-        assert dlctab.shape[0] == t.size
+        t, trigs, dlctab = _validation.prepare_table_results(
+            tabpath=dlcpath,
+            srcvideo=srcvideo,
+            t_video=timebases.videos,
+            triggers=triggers.videos,
+            mismatch_tolerance=mismatch_tolerance,
+        )
+
+        if downsample:
+            t = timebases.dFF
+
+            def _downsample(x):
+                u = _alignment.upsample(
+                    x,
+                    size=timebases.raw.size,
+                    pulseidxx=trigs,
+                )
+                return _alignment.downsample(
+                    u,
+                    pulseidxx=triggers.dFF,
+                    reduce=_np.nanmean,
+                )
 
         _stdio.message(f"{view} model...", end=' ', verbose=verbose)
-        series = []
-        keypoints = tuple(set(col[1] for col in dlctab.columns))
-        
-        # TODO: think over about what names may be appropriate
+        scorer = dlctab.columns[0][0]
         pose_estimation_name = f"{view}_video_keypoints"
+        keypoints = tuple(set(col[1] for col in dlctab.columns))
+
+        series = []
+        # TODO: think over about what names may be appropriate
         node_names = [f"{kpt}" for kpt in keypoints]
         for kpt, node_name in zip(keypoints, node_names):
-            data = _np.stack([
-                dlctab[scorer, kpt, 'x'].values,
-                dlctab[scorer, kpt, 'y'].values
-            ], axis=1)
+            if downsample:
+                # FIXME: this block should be removed
+                # when the DeepLabCut model become more efficient
+                if kpt == 'tonguetip':
+                    threshold = 0.2
+                else:
+                    threshold = 0.88
+
+                data = _validation.validate_keypoint(
+                    dlctab, kpt,
+                    threshold=threshold,
+                ).apply(_downsample).stack()
+            else:
+                data = _np.stack([
+                    dlctab[scorer, kpt, 'x'].values,
+                    dlctab[scorer, kpt, 'y'].values
+                ], axis=1)
+
             series.append(_PoseEstimationSeries(
                 name=node_name,
                 description=f"Keypoint '{kpt}' from the {view} video.",

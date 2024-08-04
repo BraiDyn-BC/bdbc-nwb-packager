@@ -343,3 +343,4 @@ def write_roi_entries(
     tab = setup_transformation_entry(roimeta.transform)
     nwbfile.add_analysis(tab)
     return mod
+

@@ -36,6 +36,8 @@ from pynwb.behavior import (
 
 from .. import (
     paths as _paths,
+    validation as _validation,
+    alignment as _alignment,
 )
 from . import (
     core as _core,
@@ -100,18 +102,42 @@ def empty_data(
 def load_pupil_fitting(
     paths: _paths.PathSettings,
     timebases: _core.Timebases,
+    triggers: Optional[_core.PulseTriggers] = None,
+    downsample: bool = False,
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
     if not paths.source.pupilfitting.exists():
         _core.print_message(f"***pupil fitting results do not exist", verbose=verbose)
         return empty_data(timebases)
     
-    data = _pd.read_hdf(paths.source.pupilfitting, key="df_with_missing")
-    t = timebases.videos
+    t, trigs, data = _validation.prepare_table_results(
+        tabpath=paths.source.pupilfitting,
+        srcvideo=paths.source.videos.eye,
+        t_video=timebases.videos,
+        triggers=triggers.videos,
+    )
+    if downsample:
+        t = timebases.dFF
+        def _prepare(x):
+            u = _alignment.upsample(
+                x,
+                size=timebases.raw.size,
+                pulseidxx=trigs,
+            )
+            return _alignment.downsample(
+                u,
+                pulseidxx=triggers.dFF,
+                reduce=_np.nanmean,
+            )
+    else:
+        def _prepare(x):
+            return x
+
+
     center_x = _SpatialSeries(
         name = 'center_x',
         description = DESCRIPTION['center_x'],
-        data = data.cx.values,
+        data = _prepare(data.cx.values),
         timestamps = t,
         reference_frame = 'top left',
         unit = 'pixels'
@@ -119,7 +145,7 @@ def load_pupil_fitting(
     center_y = _SpatialSeries(
         name = 'center_y',
         description = DESCRIPTION['center_y'],
-        data = data.cy.values,
+        data = _prepare(data.cy.values),
         timestamps = t,
         reference_frame = 'top left',
         unit = 'pixels'
@@ -130,9 +156,10 @@ def load_pupil_fitting(
     pupil_dia = _TimeSeries(
         name="diameter",
         description=DESCRIPTION['diameter'],
-        data=data.D.values,
+        data=_prepare(data.D.values),
         timestamps=t,
         unit="pixels",
     )
     pupil = _PupilTracking(time_series=pupil_dia, name="pupil_tracking")
     return PupilFittingData(eye=eye, pupil_dia=pupil)
+

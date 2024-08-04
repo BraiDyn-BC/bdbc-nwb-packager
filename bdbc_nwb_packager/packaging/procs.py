@@ -84,9 +84,11 @@ def configure_nwb_file(
 
 def package_nwb(
     paths: _paths.PathSettings,
+    tasktype: str = 'cued_lever_pull',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
+    add_downsampled: bool = True,
     override_metadata: Optional[Dict[str, None]] = None,
     overwrite: bool = False,
     verbose: bool = True,
@@ -105,21 +107,26 @@ def package_nwb(
     nwbfile = configure_nwb_file(metadata)
 
     # raw DAQ data
-    timebases = _core.load_timebases(metadata, paths.source.rawdata)
+    triggers, timebases = _core.load_timebases(metadata, paths.source.rawdata)
     for ts in _daq.iterate_raw_daq_recordings(metadata, paths.source.rawdata, timebases):
         nwbfile.add_acquisition(ts)
 
     if paths.session.type == 'task':
         # add trials
-        trials = _trials.load_trials(paths.source.rawdata, timebases)
-        _trials.write_trials(nwbfile, trials, verbose=verbose)
-
-    # downsampled DAQ data
-    ds = nwbfile.create_processing_module(
-        name="downsampled", description="downsampled DAQ acquisition"
-    )
-    for ts in _daq.iterate_downsampled_daq_recordings(metadata, paths.source.rawdata, timebases):
-        ds.add(ts)
+        trials = _trials.load_trials(
+            paths.source.rawdata,
+            timebases,
+            tasktype=tasktype,
+            verbose=verbose,
+        )
+        _trials.write_trials(
+            nwbfile,
+            trials,
+            tasktype=tasktype,
+            verbose=verbose,
+        )
+    else:
+        trials = None
 
     _videos.write_videos(
         nwbfile=nwbfile,
@@ -134,6 +141,7 @@ def package_nwb(
     frames = _imaging.load_imaging_data(
         paths.source.rawdata,
         timebases=timebases,
+        read_frames=write_imaging_frames or register_rois,
         verbose=verbose
     )
     setup  = _imaging.setup_imaging_device(metadata, nwbfile, verbose=verbose)
@@ -169,20 +177,71 @@ def package_nwb(
         for pose in _dlc.iterate_pose_estimations(
             paths=paths,
             timebases=timebases,
+            triggers=triggers,
+            downsample=False,
             verbose=verbose,
         ):
             behav.add(pose)
     
+        _stdio.message(f"registering pupil fitting...", end=' ', verbose=verbose)
         pupil =  _pupil.load_pupil_fitting(
             paths=paths,
             timebases=timebases,
+            triggers=triggers,
+            downsample=False,
             verbose=verbose
         )
         if pupil is not None:
-            _stdio.message(f"registering pupil fitting...", end=' ', verbose=verbose)
             for tracking in pupil:
                 behav.add(tracking)
             _stdio.message("done.", verbose=verbose)
+    else:
+        behav = None
+
+    # downsampled DAQ data
+    if add_downsampled:
+        ds = nwbfile.create_processing_module(
+            name="downsampled",
+            description="validated session data, down-sampled to the time base of imaging dF/F"
+        )
+
+        for ts in _daq.iterate_downsampled_daq_recordings(
+            metadata,
+            paths.source.rawdata,
+            timebases
+        ):
+            ds.add(ts)
+
+        if trials is not None:
+            ds.add(_trials.setup_downsampled_trials(
+                trials,
+                timebases,
+                tasktype=tasktype,
+                verbose=verbose
+            ))
+
+        if behav is not None:
+            for pose in _dlc.iterate_pose_estimations(
+                paths=paths,
+                triggers=triggers,
+                timebases=timebases,
+                downsample=True,
+                verbose=verbose,
+            ):
+                ds.add(pose)
+
+            _stdio.message(f"registering pupil fitting...", end=' ', verbose=verbose)
+            pupil =  _pupil.load_pupil_fitting(
+                paths=paths,
+                timebases=timebases,
+                triggers=triggers,
+                downsample=True,
+                verbose=verbose
+            )
+            if pupil is not None:
+                for tracking in pupil:
+                    ds.add(tracking)
+                _stdio.message("done.", verbose=verbose)
 
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore', category=_DtypeConversionWarning)
