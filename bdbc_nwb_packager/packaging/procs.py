@@ -213,12 +213,18 @@ def package_nwb(
             ds.add(ts)
 
         if trials is not None:
-            ds.add(_trials.setup_downsampled_trials(
+            trials_ds = _trials.load_downsampled_trials(
                 trials,
                 timebases,
                 tasktype=tasktype,
                 verbose=verbose
-            ))
+            )
+            _trials.write_trials(
+                ds,
+                trials_ds,
+                tasktype=tasktype,
+                verbose=verbose,
+            )
 
         if behav is not None:
             for pose in _dlc.iterate_pose_estimations(

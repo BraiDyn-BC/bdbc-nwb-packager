@@ -51,6 +51,7 @@ SingleROISignal = rois.SingleROISignal
 load_timebases = core.load_timebases
 
 load_trials = trials.load_trials
+load_downsampled_trials = trials.load_downsampled_trials
 write_trials = trials.write_trials
 
 iterate_raw_daq_recordings = daq.iterate_raw_daq_recordings
@@ -72,3 +73,4 @@ load_pupil_fitting = pupil.load_pupil_fitting
 
 configure_nwb_file = procs.configure_nwb_file
 package_nwb = procs.package_nwb
+
