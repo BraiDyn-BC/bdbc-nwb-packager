@@ -73,7 +73,7 @@ def extract_trials(daq: _pd.DataFrame, rate: float = 5000.0) -> _pd.DataFrame:
         resp = -1 # NA by default
         while (respoffset < respsize) and (resps[respoffset] < task_state.start[stateoffset + 1]):
             respoffset += 1
-        if resps[respoffset] < task_state.stop[stateoffset + 1]:
+        if (respoffset < respsize) and (resps[respoffset] < task_state.stop[stateoffset + 1]):
             resp = resps[respoffset]
         reaction = (resp - trial_start) / rate if resp >= 0 else _np.nan
 
