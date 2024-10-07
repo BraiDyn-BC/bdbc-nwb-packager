@@ -110,7 +110,24 @@ def load_downsampled_trials(
                 trials_ds[col].values,
                 timebases.dFF,
             )
-    return trials_ds
+    # rawdataから読み込んでdtaframede返すなコードを書く
+    return trials_ds # dataframe
+
+def _load_downsampled_trials(
+    rawfile: PathLike,
+) -> _pd.DataFrame:
+    with _h5.File(rawfile, 'r') as src:
+        # Loading from hdf5 file
+        data        = _np.array(src["behavior_ds/trial_info/data"], dtype=_np.uint32)
+        label       = _np.array(src["behavior_ds/trial_info/label"]).ravel()
+        label       = [lab.decode('utf-8') for lab in label] # convert to utf-8
+        
+        # convert to dataframe
+        trials_ds = _pd.DataFrame(data, index=label)
+        trials_ds.columns = [i for i in range(1, 132)]
+        
+        return trials_ds
+    
 
 
 def format_trials(
