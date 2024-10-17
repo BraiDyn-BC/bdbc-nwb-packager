@@ -82,37 +82,26 @@ def load_timebases(
     verbose: bool = True,
 ) -> Tuple[PulseTriggers, Timebases]:
     with _h5.File(rawfile, 'r') as src:
-        sizB = src['image/Ib'].shape[0]
-        sizV = src['image/Iv'].shape[0]
-
+        
         # NOTE: indexing is in the MATLAB format:
         # need to subtract 1 to convert to the Python format indices
-        if 'vid_acq' in src['sync_pulse'].keys():
-            videos = _np.array(src["sync_pulse/vid_acq"], dtype=_np.uint32).ravel() - 1 
-        else:
-            videos = None
-        
-        # imaging pulses
-        img_raw = _np.array(src["sync_pulse/img_acq"], dtype=_np.uint32).ravel() - 1
-        if img_raw.size % 2 != 0:
-            img_raw = _np.concatenate([raw, (0,)])
-        img_raw = img_raw.reshape((-1, 2))
-        assert sizB <= img_raw.shape[0]
-        assert sizV <= img_raw.shape[0]
-        
-        pulseB = img_raw[:sizB, 0] - 1
-        pulseV = img_raw[:sizV, 0] - 1
-    
-        # task acquisition
-        _, acqsiz = src['behavior_raw/data'].shape  # (N, T)
-        raw_t = _np.arange(0, acqsiz, dtype=_np.float32) / metadata.task.rate
-
-        print_message("done loading time bases.", verbose=verbose)
+        imgPulse =  _np.array(src["sync_pulse/img_acquisition_start"], dtype=_np.uint32).ravel() - 1
+        videoPulse = _np.array(src["sync_pulse/vid_acquisition_start"], dtype=_np.uint32).ravel() - 1
         
         trigs = PulseTriggers(
-            videos=videos,
-            B=pulseB,
-            V=pulseV,
+            videos=videoPulse,
+            B=imgPulse[::2],
+            V=imgPulse[1::2],
         )
-        return trigs, trigs.as_timebases(raw_t)
+        
+        timebase = Timebases(
+            raw=_np.array(src["tick_in_second/raw"], dtype=_np.float32).ravel(),
+            videos=_np.array(src["tick_in_second/vid"], dtype=_np.float32).ravel(),
+            B=_np.array(src["tick_in_second/img"], dtype=_np.float32).ravel(), 
+            V=_np.array(src["tick_in_second/img"], dtype=_np.float32).ravel(),
+            # B=_np.array(src["tick_in_seconds/img_B"], dtype=_np.float32).ravel(), 
+            # V=_np.array(src["tick_in_seconds/img_V"], dtype=_np.float32).ravel(),
+        )
+        
+        return trigs, timebase
 

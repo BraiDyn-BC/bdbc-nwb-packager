@@ -296,9 +296,10 @@ def metadata_from_rawdata(
 ) -> Metadata:
     basedict = read_metadata_as_dict(rawfile)
     # overwrite session metadata using `session`
-    basedict['session_description'] = session.description
-    basedict['session_notes'] = session.comments
-    basedict['session_type']  = session.type
+    if session is not None:
+        #basedict['session_description'] = session.description
+        basedict['session_notes'] = session.comments
+        basedict['session_type']  = session.type
     if override is not None:
         basedict.update(override)
     return Metadata(

@@ -111,22 +111,22 @@ def package_nwb(
     for ts in _daq.iterate_raw_daq_recordings(metadata, paths.source.rawdata, timebases):
         nwbfile.add_acquisition(ts)
 
-    if paths.session.type == 'task':
-        # add trials
-        trials = _trials.load_trials(
-            paths.source.rawdata,
-            timebases,
-            tasktype=tasktype,
-            verbose=verbose,
-        )
-        _trials.write_trials(
-            nwbfile,
-            trials,
-            tasktype=tasktype,
-            verbose=verbose,
-        )
-    else:
-        trials = None
+    # if paths.session.type == 'task':
+    #     # add trials
+    #     trials = _trials.load_trials(
+    #         paths.source.rawdata,
+    #         timebases,
+    #         tasktype=tasktype,
+    #         verbose=verbose,
+    #     )
+    #     _trials.write_trials(
+    #         nwbfile,
+    #         trials,
+    #         tasktype=tasktype,
+    #         verbose=verbose,
+    #     )
+    # else:
+    #     trials = None
 
     _videos.write_videos(
         nwbfile=nwbfile,
@@ -199,6 +199,7 @@ def package_nwb(
         behav = None
 
     # downsampled DAQ data
+    # ====== Fix _daq.iterate_downsampled_daq_recordings and _trials.load_downsampled_trials(
     if add_downsampled:
         ds = nwbfile.create_processing_module(
             name="downsampled",
@@ -219,6 +220,10 @@ def package_nwb(
                 tasktype=tasktype,
                 verbose=verbose
             )
+            # _load_downsampled_trialsを書き換えて読み込んでDF出力をつくる
+            # trials_ds = _trials._load_downsampled_trials(
+            #     rawfile = paths.source.rawdata
+            # )
             _trials.write_trials(
                 ds,
                 trials_ds,
