@@ -20,10 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Tuple, Iterable, Dict
+from typing import Tuple, Dict
 from typing_extensions import Self
 from collections import namedtuple as _namedtuple
-import sys as _sys
 from time import time as _now
 import warnings as _warnings
 
@@ -154,10 +153,10 @@ def compute_single_roi_signal(
     flattened_data: _imaging.ImagingData,
     signal_filter: SignalFilter,
 ) -> SingleROISignal:
-    
+
     def _baseline(x):
         return _np.median(x)
-    
+
     def _as_dFF(x):
         m = _baseline(x)
         return (x - m) / m
@@ -276,7 +275,7 @@ def setup_roisignals_entry(
             category=UserWarning,
             module='hdmf'
         )
-        
+
         # register rois (and collect signals)
         for roi in roisigs:
             for typ, pln in seg.frames.items():
@@ -287,7 +286,7 @@ def setup_roisignals_entry(
                 )
             for typ in seg.channels.keys():
                 signals[typ].append(getattr(roi, typ).ravel())
-    
+
         # register FOVs (i.e. B and V channel frames)
         FOVs = dict()
         for frame, pln in seg.frames.items():
@@ -296,7 +295,7 @@ def setup_roisignals_entry(
                 description=seg.frame_description(frame),
             )
         FOVs['dFF'] = FOVs['B']  # FIXME: ad hoc addition
-    
+
         # register signals
         dff = _DfOverF()
         for typ, FOV in FOVs.items():
@@ -343,4 +342,3 @@ def write_roi_entries(
     tab = setup_transformation_entry(roimeta.transform)
     nwbfile.add_analysis(tab)
     return mod
-

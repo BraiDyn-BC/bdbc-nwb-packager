@@ -24,7 +24,6 @@ from typing import Optional, Generator, Callable, Union, Iterable, Dict, Any
 from pathlib import Path
 from datetime import datetime as _datetime
 from time import time as _now
-import sys as _sys
 
 import bdbc_session_explorer as _sessx
 
@@ -73,7 +72,7 @@ def run_batch(
     ):
         _stdio.message(f"[{sess.batch}/{sess.animal} {sess.longdate} ({sess.longtype})]", verbose=verbose)
         if not sess.has_rawdata():
-            _stdio.message(f"***no raw data file", end='\n\n', verbose=verbose)
+            _stdio.message("***no raw data file", end='\n\n', verbose=verbose)
             continue
         start = _now()
         paths = _paths.setup_path_settings(
@@ -108,16 +107,19 @@ def run_batch(
 
 
 def parse_overridden_metadata(spec: Optional[str]) -> Optional[Dict[str, Any]]:
+
     def _as_int(v) -> Optional[int]:
         try:
             return int(v)
         except ValueError:
             return None
+
     def _as_float(v) -> Optional[float]:
         try:
             return float(v)
         except ValueError:
             return None
+
     def _normalize(v: str) -> Union[str, int, float]:
         if (iv := _as_int(v)) is not None:
             return iv
@@ -125,6 +127,7 @@ def parse_overridden_metadata(spec: Optional[str]) -> Optional[Dict[str, Any]]:
             return fv
         else:
             return v
+
     if spec is None:
         return None
     rawspecs = tuple(item.strip() for item in spec.split(',') if len(item) > 0)
@@ -152,28 +155,30 @@ def filter_sessions(
     is_animal = matcher.animal(animal)
     is_date = matcher.date(from_date=fromdate, to_date=todate)
     is_type = matcher.session_type(type)
-    
+
     def _matches(session: _sessx.Session) -> bool:
         return is_animal(session.animal) and is_date(session.date) and is_type(session.type)
-    
+
     sessions_root_dir = _paths.sessions_root_dir(sessions_root_dir)
-    yield from (sess for sess in _sessx.iterate_sessions(sessions_root_dir) \
-            if _matches(sess))
+    yield from (sess for sess in _sessx.iterate_sessions(sessions_root_dir)
+                if _matches(sess))
 
 
-class matcher:    
+class matcher:
     @staticmethod
     def matches_all(query: str) -> bool:
         return True
-    
+
     @staticmethod
     def animal(ref: Optional[str]) -> Callable[[str], bool]:
         if ref is None:
             return matcher.matches_all
         else:
             refs = tuple(item.strip() for item in ref.split(','))
+
             def match(query: str) -> bool:
                 return (query in refs)
+
             return match
 
     @staticmethod
@@ -182,8 +187,10 @@ class matcher:
             return matcher.matches_all
         else:
             ref = _datetime.strptime(ref, '%y%m%d')
+
             def match(query: _datetime) -> bool:
                 return (query >= ref)
+
             return match
 
     @staticmethod
@@ -192,10 +199,12 @@ class matcher:
             return matcher.matches_all
         else:
             ref = _datetime.strptime(ref, '%y%m%d')
+
             def match(query: _datetime) -> bool:
                 return (query <= ref)
+
             return match
-        
+
     @staticmethod
     def date(
         from_date: Optional[str],
@@ -203,10 +212,12 @@ class matcher:
     ) -> Callable[[str], bool]:
         from_date = matcher.from_date(from_date)
         to_date = matcher.to_date(to_date)
+
         def match(query: _datetime) -> bool:
             return from_date(query) and to_date(query)
+
         return match
-        
+
     @staticmethod
     def session_type(
         ref: Optional[str]
@@ -228,4 +239,3 @@ class matcher:
             def match(query: str) -> bool:
                 return (query in refs)
             return match
-

@@ -21,7 +21,6 @@
 # SOFTWARE.
 
 from typing import Tuple
-from pathlib import Path
 from collections import namedtuple as _namedtuple
 import sys as _sys
 
@@ -82,26 +81,21 @@ def load_timebases(
     verbose: bool = True,
 ) -> Tuple[PulseTriggers, Timebases]:
     with _h5.File(rawfile, 'r') as src:
-        
         # NOTE: indexing is in the MATLAB format:
         # need to subtract 1 to convert to the Python format indices
-        imgPulse =  _np.array(src["sync_pulse/img_acquisition_start"], dtype=_np.uint32).ravel() - 1
+        imgPulse = _np.array(src["sync_pulse/img_acquisition_start"], dtype=_np.uint32).ravel() - 1
         videoPulse = _np.array(src["sync_pulse/vid_acquisition_start"], dtype=_np.uint32).ravel() - 1
-        
+
+        # TODO: check other entries
         trigs = PulseTriggers(
             videos=videoPulse,
             B=imgPulse[::2],
             V=imgPulse[1::2],
         )
-        
         timebase = Timebases(
             raw=_np.array(src["tick_in_second/raw"], dtype=_np.float32).ravel(),
             videos=_np.array(src["tick_in_second/vid"], dtype=_np.float32).ravel(),
             B=_np.array(src["tick_in_second/img"], dtype=_np.float32).ravel(), 
             V=_np.array(src["tick_in_second/img"], dtype=_np.float32).ravel(),
-            # B=_np.array(src["tick_in_seconds/img_B"], dtype=_np.float32).ravel(), 
-            # V=_np.array(src["tick_in_seconds/img_V"], dtype=_np.float32).ravel(),
         )
-        
         return trigs, timebase
-

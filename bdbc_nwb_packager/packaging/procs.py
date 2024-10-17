@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2024 Keisuke Sehara and Ryo Aoki
+# Copyright (c) 2024 Keisuke Sehara, Ryo Aoki and Shoya Sugimoto
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,14 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from uuid import uuid4 as _uuid4
 from datetime import datetime as _datetime
 import warnings as _warnings
 
-import numpy as _np
-import numpy.typing as _npt
-import h5py as _h5
 import pynwb as _nwb
 from hdmf.build.warnings import (
     DtypeConversionWarning as _DtypeConversionWarning,
@@ -75,8 +72,8 @@ def configure_nwb_file(
         species=metadata.subject.species,
         subject_id=metadata.subject.ID,
         weight=metadata.subject.weight,
-        date_of_birth = _datetime.combine(metadata.subject.date_of_birth, _datetime.min.time()).astimezone(None),
-        strain = metadata.subject.strain,
+        date_of_birth=_datetime.combine(metadata.subject.date_of_birth, _datetime.min.time()).astimezone(None),
+        strain=metadata.subject.strain,
     )
     _stdio.message("configured an NWB file.", verbose=verbose)
     return nwbfile
@@ -98,7 +95,7 @@ def package_nwb(
         _stdio.message(f"***file already exists: '{outfile}'", verbose=verbose)
         # FIXME: load the contents from the file to return
         return
-    
+
     metadata = _metadata.metadata_from_rawdata(
         paths.session,
         paths.source.rawdata,
@@ -111,22 +108,22 @@ def package_nwb(
     for ts in _daq.iterate_raw_daq_recordings(metadata, paths.source.rawdata, timebases):
         nwbfile.add_acquisition(ts)
 
-    # if paths.session.type == 'task':
-    #     # add trials
-    #     trials = _trials.load_trials(
-    #         paths.source.rawdata,
-    #         timebases,
-    #         tasktype=tasktype,
-    #         verbose=verbose,
-    #     )
-    #     _trials.write_trials(
-    #         nwbfile,
-    #         trials,
-    #         tasktype=tasktype,
-    #         verbose=verbose,
-    #     )
-    # else:
-    #     trials = None
+    if paths.session.type == 'task':
+        # add trials
+        trials = _trials.load_trials(
+            paths.source.rawdata,
+            timebases,
+            tasktype=tasktype,
+            verbose=verbose,
+        )
+        _trials.write_trials(
+            nwbfile,
+            trials,
+            tasktype=tasktype,
+            verbose=verbose,
+        )
+    else:
+        trials = None
 
     _videos.write_videos(
         nwbfile=nwbfile,
@@ -146,7 +143,7 @@ def package_nwb(
     )
     setup  = _imaging.setup_imaging_device(metadata, nwbfile, verbose=verbose)
     _imaging.write_imaging_data(
-        nwbfile=nwbfile, 
+        nwbfile=nwbfile,
         destination=paths.destination,
         frames=frames,
         setup=setup,
@@ -182,9 +179,9 @@ def package_nwb(
             verbose=verbose,
         ):
             behav.add(pose)
-    
-        _stdio.message(f"registering pupil fitting...", end=' ', verbose=verbose)
-        pupil =  _pupil.load_pupil_fitting(
+
+        _stdio.message("registering pupil fitting...", end=' ', verbose=verbose)
+        pupil = _pupil.load_pupil_fitting(
             paths=paths,
             timebases=timebases,
             triggers=triggers,
@@ -199,7 +196,6 @@ def package_nwb(
         behav = None
 
     # downsampled DAQ data
-    # ====== Fix _daq.iterate_downsampled_daq_recordings and _trials.load_downsampled_trials(
     if add_downsampled:
         ds = nwbfile.create_processing_module(
             name="downsampled",
@@ -241,8 +237,8 @@ def package_nwb(
             ):
                 ds.add(pose)
 
-            _stdio.message(f"registering pupil fitting...", end=' ', verbose=verbose)
-            pupil =  _pupil.load_pupil_fitting(
+            _stdio.message("registering pupil fitting...", end=' ', verbose=verbose)
+            pupil = _pupil.load_pupil_fitting(
                 paths=paths,
                 timebases=timebases,
                 triggers=triggers,
@@ -257,12 +253,11 @@ def package_nwb(
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore', category=_DtypeConversionWarning)
         with _nwb.NWBHDF5IO(
-            outfile, 
+            outfile,
             mode="w",
             manager=_nwb.get_manager(),
         ) as out:
             out.write(nwbfile)
-    
+
     _stdio.message(f"saved NWB file to: '{outfile}'", verbose=verbose)
     return nwbfile
-

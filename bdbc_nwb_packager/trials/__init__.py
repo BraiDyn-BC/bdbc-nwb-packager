@@ -32,4 +32,3 @@ _reload(cued_lever_pull)
 
 load_raw_daq = common.load_raw_daq
 extract_blocks = common.extract_blocks
-

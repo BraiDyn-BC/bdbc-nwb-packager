@@ -19,6 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+
 from typing import Union
 from pathlib import Path
 
@@ -30,7 +31,7 @@ import h5py as _h5
 
 def load_raw_daq(rawfile: Union[str, Path]) -> _pd.DataFrame:
     with _h5.File(rawfile, 'r') as src:
-        labels = tuple(item.decode('utf-8').replace('.', '').replace(' ', '-').replace('-', '_') \
+        labels = tuple(item.decode('utf-8').replace('.', '').replace(' ', '-').replace('-', '_')
                        for item in _np.array(src['behavior_raw/label']).ravel())
         data = _np.array(src['behavior_raw/data'])
     return _pd.DataFrame(data=dict((labels[i], data[i]) for i in range(len(labels))))
@@ -46,6 +47,7 @@ def extract_blocks(flags: _npt.NDArray) -> _pd.DataFrame:
         'stop': [],
         'value': [],
     }
+
     def _add(start, stop):
         vals = tuple(set(v for v in flags[start:stop]))
         assert len(vals) == 1
@@ -57,4 +59,3 @@ def extract_blocks(flags: _npt.NDArray) -> _pd.DataFrame:
         _add(int(start), int(stop))
     _add(int(stop), int(flags.size))
     return _pd.DataFrame(data=data)
-

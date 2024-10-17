@@ -24,7 +24,6 @@ from typing import Tuple, Generator, Union, Optional
 from collections import namedtuple as _namedtuple
 
 import numpy as _np
-import pandas as _pd
 from pynwb import (
     TimeSeries as _TimeSeries,
 )
@@ -67,7 +66,7 @@ def empty_data(
     # t = timebases.videos
     # values = _np.empty((t.size,), dtype=_np.float32)
     # values.fill(_np.nan)
-    
+
     # center_x = _SpatialSeries(
     #     name = 'center_x',
     #     description = f"(data missing) {DESCRIPTION['center_x']}",
@@ -107,9 +106,9 @@ def load_pupil_fitting(
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
     if not paths.source.pupilfitting.exists():
-        _core.print_message(f"***pupil fitting results do not exist", verbose=verbose)
+        _core.print_message("***pupil fitting results do not exist", verbose=verbose)
         return empty_data(timebases)
-    
+
     t, trigs, data = _validation.prepare_table_results(
         tabpath=paths.source.pupilfitting,
         srcvideo=paths.source.videos.eye,
@@ -118,6 +117,7 @@ def load_pupil_fitting(
     )
     if downsample:
         t = timebases.dFF
+
         def _prepare(x):
             u = _alignment.upsample(
                 x,
@@ -129,26 +129,27 @@ def load_pupil_fitting(
                 pulseidxx=triggers.dFF,
                 reduce=_np.nanmean,
             )
+
     else:
+
         def _prepare(x):
             return x
 
-
     center_x = _SpatialSeries(
-        name = 'center_x',
-        description = DESCRIPTION['center_x'],
-        data = _prepare(data.cx.values),
-        timestamps = t,
-        reference_frame = 'top left',
-        unit = 'pixels'
+        name='center_x',
+        description=DESCRIPTION['center_x'],
+        data=_prepare(data.cx.values),
+        timestamps=t,
+        reference_frame='top left',
+        unit='pixels'
     )
     center_y = _SpatialSeries(
-        name = 'center_y',
-        description = DESCRIPTION['center_y'],
-        data = _prepare(data.cy.values),
-        timestamps = t,
-        reference_frame = 'top left',
-        unit = 'pixels'
+        name='center_y',
+        description=DESCRIPTION['center_y'],
+        data=_prepare(data.cy.values),
+        timestamps=t,
+        reference_frame='top left',
+        unit='pixels'
     )
     eye = _EyeTracking(name="eye_position", spatial_series=center_x)
     eye.add_spatial_series(spatial_series=center_y)
@@ -162,4 +163,3 @@ def load_pupil_fitting(
     )
     pupil = _PupilTracking(time_series=pupil_dia, name="pupil_tracking")
     return PupilFittingData(eye=eye, pupil_dia=pupil)
-

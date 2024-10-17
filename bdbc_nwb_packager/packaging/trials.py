@@ -1,6 +1,6 @@
 # MIT License
 #
-# Copyright (c) 2024 Keisuke Sehara and Ryo Aoki
+# Copyright (c) 2024 Keisuke Sehara, Ryo Aoki and Shoya Sugimoto
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,8 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Dict, Union
-from pathlib import Path
+from typing import Union
 from time import time as _now
 
 import numpy as _np
@@ -34,7 +33,6 @@ from pynwb.epoch import TimeIntervals as _TimeIntervals
 from .. import (
     stdio as _stdio,
     trials as _trials,
-    alignment as _alignment,
 )
 from . import (
     core as _core,
@@ -93,7 +91,7 @@ def load_downsampled_trials(
         # Loading from hdf5 file
         data        = _np.array(src["behavior_ds/trial_info/data"], dtype=_np.float32).T
         label       = _np.array(src["behavior_ds/trial_info/label"]).ravel()
-        label       = [lab.decode('utf-8') for lab in label] # convert to utf-8
+        label       = [lab.decode('utf-8') for lab in label]  # convert to utf-8
         # convert to dataframe
         trials_ds = _pd.DataFrame(data, columns=label)
         return trials_ds
@@ -128,7 +126,10 @@ def write_trials(
         table = None
         _add_column = parent.add_trial_column
         _add_row = parent.add_trial
-        _finalize = lambda tab: None
+
+        def _finalize(tab):
+            pass
+
     else:
         taskname = tasktype.replace('_', '-')
         table = _TimeIntervals(
@@ -137,6 +138,7 @@ def write_trials(
         )
         _add_column = table.add_column
         _add_row = table.add_row
+
         def _finalize(tab):
             parent.add(tab)
 
@@ -151,4 +153,3 @@ def write_trials(
         )
     _finalize(table)
     _stdio.message("done registration of trials.", verbose=verbose)
-

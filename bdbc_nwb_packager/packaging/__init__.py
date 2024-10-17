@@ -73,4 +73,3 @@ load_pupil_fitting = pupil.load_pupil_fitting
 
 configure_nwb_file = procs.configure_nwb_file
 package_nwb = procs.package_nwb
-

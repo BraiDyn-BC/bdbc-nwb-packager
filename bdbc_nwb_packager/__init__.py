@@ -55,4 +55,3 @@ read_roi_metadata = metadata.read_roi_metadata
 package_nwb = packaging.package_nwb
 
 run_batch = batch.run_batch
-

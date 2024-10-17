@@ -24,7 +24,6 @@ from typing import Generator
 from time import time as _now
 
 import numpy as _np
-import numpy.typing as _npt
 import h5py as _h5
 import pynwb as _nwb
 
@@ -54,7 +53,7 @@ def iterate_raw_daq_recordings(
     t = timebases.raw
     for i, lab in enumerate(metadata.task.raw_labels):
         yield _nwb.TimeSeries(
-            name=lab.replace('_raw', ''), # FIXME; need description
+            name=lab.replace('_raw', ''),  # FIXME; need description
             data=raw[:, i],
             unit="a.u.",  # FIXME: check units
             timestamps=t,
@@ -80,7 +79,7 @@ def iterate_downsampled_daq_recordings(
     clip = slice(0, t.size)
     for i, lab in enumerate(metadata.task.downsampled_labels):
         yield _nwb.TimeSeries(
-            name=lab.replace('_ds', ''), # FIXME; need description
+            name=lab.replace('_ds', ''),  # FIXME; need description
             data=ds[clip, i],
             unit="a.u.",  # FIXME: check units
             timestamps=t,

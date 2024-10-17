@@ -67,7 +67,7 @@ def daqindex_to_pulseindex(
         if daqidx == -1:
             out[i] = -1
             continue
-        
+
         daqtrig = daq_t[daqidx]
         while ((offset + 1) < pulsesiz) and (pulse_t[offset + 1] < daqtrig):
             offset += 1
@@ -112,12 +112,12 @@ def upsample(
     out.fill(_np.nan)
     offsetceil = pulseidxx.size - 1  # exclude the last one
     offset = 0
-    
+
     def _linear(start, stop, vstart, vend):
         siz = stop - start
         vals = _np.arange(0, siz) / (siz - 1)  # [0, 1]
         return vals * (vend - vstart) + vstart
-        
+
     offsetceil = pulseidxx.size - 1  # exclude the last one
     offset = 0
     while offset < offsetceil:
@@ -162,10 +162,10 @@ def downsample(
         for i, start, stop in zip(
             range(pulseidxx.size - 1),
             pulseidxx[:-1],
-            pulseidxx[1:]):
+            pulseidxx[1:]
+        ):
             out[i] = reduce(values[start:stop])
         start = pulseidxx[-1]
         stop  = min(values.size, start + interval)
         out[-1] = reduce(values[start:stop])
     return out
-

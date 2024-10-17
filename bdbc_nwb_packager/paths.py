@@ -24,17 +24,10 @@ from typing import Union, Optional, Tuple, Generator, Iterable
 from typing_extensions import Self
 from pathlib import Path
 from collections import namedtuple as _namedtuple
-from datetime import datetime as _datetime
-import sys as _sys
 import os as _os
 import json as _json
-import warnings as _warnings
 
 import bdbc_session_explorer as _sessx
-
-from . import (
-    stdio as _stdio,
-)
 
 
 PathLike = Union[str, Path]
@@ -118,10 +111,6 @@ class VideoDataFile(_namedtuple('VideoDataFile', (
 
     def relative_to(self, ref: Path) -> Self:
         return self._replace(path=self.path.relative_to(ref))
-
-
-def warn_message(msg: str, end='\n'):
-    print(msg, end=end, file=_sys.stderr, flush=True)
 
 
 def ensure_root_dir(
@@ -209,7 +198,7 @@ def setup_source_paths(
     mesoroot  = mesoscaler_root_dir(mesoroot)
     dlcroot   = dlcresults_root_dir(dlcroot)
     pupilroot = pupilfitting_root_dir(pupilroot)
-    
+
     rawfile  = _sessx.locate_rawdata_file(session, rawroot)
     mesofile = _sessx.locate_mesoscaler_file(session, mesoroot=mesoroot)
     if (mesofile is None) or (not mesofile.exists()):
@@ -227,7 +216,7 @@ def setup_source_paths(
     dlcfiles = _sessx.dlc_output_files_from_session(session, dlcroot=dlcroot)
     # TODO:
     #   run DeepLabCut in case any of the output is missing?
-    
+
     pupfile  = _sessx.locate_pupil_file(session, pupilroot=pupilroot)
     if (pupfile is None) or (not pupfile.exists()):
         # TODO: probably run fit_pupil?
@@ -252,7 +241,7 @@ def setup_destination_paths(
     nwbfile  = sessdir / f"{sessname}.nwb"
     imgdir   = sessdir / 'imaging'
     videodir = sessdir / 'videos'
-    
+
     images   = ImagingDataFiles(
         B=(imgdir / f"{sessname}_B.tiff"),
         V=(imgdir / f"{sessname}_V.tiff"),
@@ -272,7 +261,7 @@ def setup_destination_paths(
 def setup_model_configs(
     **kwargs
 ) -> DLCModelConfigs:
-    cfg = dict((fld, dlc_model_dir(fld, arg) / 'config.yaml') \
+    cfg = dict((fld, dlc_model_dir(fld, arg) / 'config.yaml')
                for fld, arg in kwargs.items())
     return DLCModelConfigs(**cfg)
 
@@ -314,4 +303,3 @@ def setup_path_settings(
         dlc_configs=dlc_configs,
         destination=dest,
     )
-

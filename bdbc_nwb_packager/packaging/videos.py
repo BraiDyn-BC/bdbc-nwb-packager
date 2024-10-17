@@ -60,7 +60,7 @@ def write_videos(
     copy_files: bool = True,
     verbose: bool = True,
 ) -> VideoEntries:
-    
+
     relfiles = paths.destination.videos.relative_to(paths.destination.session_dir)
     t = timebases.videos
     device = nwbfile.create_device(
@@ -68,7 +68,7 @@ def write_videos(
         description=metadata.videos.device.description,
         manufacturer=metadata.videos.device.manufacturer,
     )
-    
+
     entries = dict()
     for view in VideoEntries._fields:
         srcpath = getattr(paths.source.videos, view).path
@@ -79,7 +79,7 @@ def write_videos(
             continue
         if not dstpath.parent.exists():
             dstpath.parent.mkdir(parents=True)
-        
+
         if copy_files:
             _stdio.message(f"copying {view} video...", end=' ', verbose=verbose)
             start = _now()
@@ -94,7 +94,7 @@ def write_videos(
             name=f"{view}_video",
             description=f"behavioral video acquisition, {desc}.",
             unit="n.a.",
-            format="external", 
+            format="external",
             external_file=[str(getattr(relfiles, view))],
             starting_frame=[0],
             timestamps=t,
@@ -106,4 +106,3 @@ def write_videos(
     _stdio.message("done registering the video files.", verbose=verbose)
 
     return VideoEntries(**entries)
-

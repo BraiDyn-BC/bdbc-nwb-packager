@@ -20,21 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Generator, Optional
-from collections import namedtuple as _namedtuple
-from time import time as _now
-from uuid import uuid4 as _uuid4
-import warnings as _warnings
+from typing import Optional
 
 import numpy as _np
-import numpy.typing as _npt
-import pandas as _pd
-from pynwb import (
-    NWBFile as _NWBFile,
-)
-from neuroconv.datainterfaces import (
-    DeepLabCutInterface as _DeepLabCutInterface,
-)
 from ndx_pose import (
     PoseEstimationSeries as _PoseEstimationSeries,
     PoseEstimation as _PoseEstimation,
@@ -48,7 +36,6 @@ from .. import (
 )
 from . import (
     core as _core,
-    videos as _videos,
 )
 
 PathLike = _core.PathLike
@@ -168,4 +155,3 @@ def iterate_pose_estimations(
             source_software="DeepLabCut",
             source_software_version="2.3.10",
         )
-

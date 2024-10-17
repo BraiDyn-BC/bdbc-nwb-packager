@@ -30,4 +30,3 @@ def message(
 ):
     if verbose:
         print(msg, file=_sys.stderr, end=end, flush=True)
-

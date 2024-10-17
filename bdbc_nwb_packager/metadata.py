@@ -25,7 +25,6 @@ from typing_extensions import Self
 from pathlib import Path
 from collections import namedtuple as _namedtuple
 from datetime import datetime as _datetime
-import sys as _sys
 
 import numpy as _np
 import numpy.typing as _npt
@@ -62,7 +61,7 @@ class SessionMetadata(_namedtuple('SessionMetadata', (
     'institution',
     'notes',
 ))):
-    
+
     @classmethod
     def from_dict(
         cls,
@@ -113,7 +112,7 @@ class SubjectMetadata(_namedtuple('SubjectMetadata', (
     @property
     def age_reference(self) -> str:
         return self.AGE_REFERENCE
-    
+
     @classmethod
     def from_dict(cls, dct: Dict[str, Any]) -> Self:
         ID = dct['subject_id']
@@ -160,7 +159,7 @@ class TaskRecordingMetadata(_namedtuple('TaskRecordingMetadata', (
     @property
     def rate(self) -> float:
         return self.RATE
-    
+
     @classmethod
     def from_dict(cls, dct: Dict[str, Any]) -> Self:
         dev = DeviceMetadata(
@@ -247,7 +246,7 @@ class BehaviorVideosMetadata(_namedtuple('BehaviorVideosMetadata', (
     @property
     def rate(self) -> float:
         return self.RATE
-    
+
     @classmethod
     def from_dict(cls, dct: Dict[str, Any]) -> Self:
         dev = DeviceMetadata(
@@ -297,7 +296,6 @@ def metadata_from_rawdata(
     basedict = read_metadata_as_dict(rawfile)
     # overwrite session metadata using `session`
     if session is not None:
-        #basedict['session_description'] = session.description
         basedict['session_notes'] = session.comments
         basedict['session_type']  = session.type
     if override is not None:
@@ -328,11 +326,11 @@ def read_metadata_as_dict(h5file: PathLike) -> Dict[str, Any]:
         else:
             # assumes byte string
             return content[0].decode('utf-8')
-    
+
     def swap_key_(dct, key_old: str, key_new: str):
         if (key_new not in dct.keys()) and (key_old in dct.keys()):
             dct[key_new] = dct.pop(key_old)
-    
+
     def fill_(dct, key: str, default: Any):
         if key not in dct.keys():
             dct[key] = default
@@ -340,13 +338,13 @@ def read_metadata_as_dict(h5file: PathLike) -> Dict[str, Any]:
     def as_string_items_(entry: _h5.Dataset) -> Tuple[str]:
         content = _np.array(entry).ravel()
         return tuple(item.decode('utf-8') for item in content)
-    
+
     with _h5.File(h5file, 'r') as src:
         group = src['metadata']
         metadata = dict((key.lower(), pythonify_(group[key])) for key in group.keys())
         metadata['bhv_raw_labels'] = as_string_items_(src['behavior_raw/label'])
         metadata['bhv_ds_labels']  = as_string_items_(src['behavior_ds/label'])
-    
+
     swap_key_(metadata, 'spiecies', 'species')
     swap_key_(metadata, 'mouseid', 'subject_id')
     swap_key_(metadata, 'dob', 'date_of_birth')
@@ -372,7 +370,7 @@ def read_roi_metadata(
         mask = _np.array(entry, dtype=_np.uint8)
         mask = mask / mask.max()
         return mask > 0.5
-    
+
     with _h5.File(mesofile, 'r') as src:
         trans = _np.array(src['transform/atlas_to_data'], dtype=_np.float32)
         rois = []

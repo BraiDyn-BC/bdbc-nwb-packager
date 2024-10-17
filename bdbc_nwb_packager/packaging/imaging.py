@@ -103,7 +103,6 @@ def setup_imaging_device(
     nwbfile: _nwb.NWBFile,
     verbose: bool = True,
 ) -> NWBImagingSetup:
-    
     device = nwbfile.create_device(
         name=metadata.imaging.device.name,
         description=metadata.imaging.device.description,
@@ -114,7 +113,7 @@ def setup_imaging_device(
         description="an optical channel",  # FIXME: need description
         emission_lambda=metadata.imaging.B.emission,  # NOTE: common between the frames
     )
-    
+
     # blue channel
     pln_B = nwbfile.create_imaging_plane(
         name="ImagingPlane_blue",
@@ -130,7 +129,7 @@ def setup_imaging_device(
         origin_coords=[0.0, 0.0],
         origin_coords_unit="meters",
     )
-    
+
     # UV channel
     pln_V = nwbfile.create_imaging_plane(
         name="ImagingPlane_UV",
@@ -183,27 +182,26 @@ def write_imaging_data(
     _stdio.message("adding channels to registry...", end=' ', verbose=verbose)
     start = _now()
     sig_B = _nwb.ophys.OnePhotonSeries(
-        name = 'widefield_blue',
-        description = 'widefield imaging data, blue channel',
-        imaging_plane = setup.B,
-        unit = "n.a.",
-        external_file = [str(relfiles.B)],
-        format = "external", 
-        starting_frame = [0],
-        timestamps = frames.time.B,
+        name='widefield_blue',
+        description='widefield imaging data, blue channel',
+        imaging_plane=setup.B,
+        unit="n.a.",
+        external_file=[str(relfiles.B)],
+        format="external",
+        starting_frame=[0],
+        timestamps=frames.time.B,
     )
     sig_V = _nwb.ophys.OnePhotonSeries(
-        name = 'widefield_UV',
-        description = 'widefield imaging data, UV channel',
-        imaging_plane = setup.V,
-        unit = "n.a.",
-        external_file = [str(relfiles.V)],
-        format = "external", 
-        starting_frame = [0],
-        timestamps = frames.time.V,
+        name='widefield_UV',
+        description='widefield imaging data, UV channel',
+        imaging_plane=setup.V,
+        unit="n.a.",
+        external_file=[str(relfiles.V)],
+        format="external",
+        starting_frame=[0],
+        timestamps=frames.time.V,
     )
     nwbfile.add_acquisition(sig_B)
     nwbfile.add_acquisition(sig_V)
     stop = _now()
     _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
-

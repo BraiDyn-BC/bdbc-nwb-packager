@@ -53,7 +53,7 @@ def extract_trials(daq: _pd.DataFrame, rate: float = 5000.0) -> _pd.DataFrame:
     # (supra-threshold) lever responses
     resps = _common.extract_blocks(daq.Over_thr > 0)
     resps = resps.loc[resps.value == True].drop(['value'], axis=1).start.values
-    
+
     trials = []
     statesize = task_state.shape[0]
     respsize = resps.shape[0]
@@ -70,7 +70,7 @@ def extract_trials(daq: _pd.DataFrame, rate: float = 5000.0) -> _pd.DataFrame:
         trial_end = task_state.stop[stateoffset + 1]
 
         # detect response
-        resp = -1 # NA by default
+        resp = -1  # NA by default
         while (respoffset < respsize) and (resps[respoffset] < task_state.start[stateoffset + 1]):
             respoffset += 1
         if (respoffset < respsize) and (resps[respoffset] < task_state.stop[stateoffset + 1]):
@@ -93,4 +93,3 @@ def extract_trials(daq: _pd.DataFrame, rate: float = 5000.0) -> _pd.DataFrame:
             'reward': rewarded,
         })
     return _pd.DataFrame(data=trials)
-

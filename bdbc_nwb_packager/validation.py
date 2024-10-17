@@ -66,16 +66,16 @@ def validate_keypoint(
         return _np.logical_and(
             v >= _np.nanpercentile(v, alpha),
             v <= _np.nanpercentile(v, 100 - alpha),
-        )    
+        )
     scorer = dlcdata.columns[0][0]
     x = _np.array(dlcdata[scorer, keypoint, 'x'].values)
     y = _np.array(dlcdata[scorer, keypoint, 'y'].values)
-    
+
     # likelihood-based filtering
     valid = dlcdata[scorer, keypoint, 'likelihood'].values >= threshold
     x[~valid] = _np.nan
     y[~valid] = _np.nan
-    
+
     # percentile-based filtering
     valid = _np.logical_and(
         _by_percentile(x),
@@ -122,11 +122,10 @@ def prepare_table_results(
         num_pulses=t_video.size,
         mismatch_tolerance=mismatch_tolerance,
     )
-    
+
     tab = _pd.read_hdf(tabpath, key=entry_path)
     tab = tab.iloc[vclip]
     t = t_video[tclip]
     trigs = triggers[tclip]
     assert tab.shape[0] == t.size
     return (t, trigs, tab)
-
