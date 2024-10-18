@@ -132,9 +132,9 @@ class SubjectMetadata(_namedtuple('SubjectMetadata', (
                 f"failed to parse subject DoB: '{dct['date_of_birth']}'"
             )
         age = dct['age']
-        baseweight = dct['baseweight']
+        baseweight = dct['base_weight']
         weight = dct['weight']
-        desc = dct['description']
+        desc = dct.get('subject_description', '')
         return cls(
             ID=ID,
             species=species,
@@ -204,23 +204,19 @@ class ImagingMetadata(_namedtuple('ImagingMetadata', (
         )
         pix = dct['imaging_pixel_size']
         rate = dct['imaging_frame_rate']
+        channel_names = (
+            dct['exc_order1'].upper(),
+            dct['exc_order2'].upper(),
+        )
         chans = (
             ImagingPlaneMetadata(
-                'B',
-                excitation=float(dct['exc_wavelength'][1]),
-                emission=float(dct['emi_wavelength']),
+                chan,
+                excitation=float(dct['exc_wavelength'][i]),
+                emission=float(dct['emi_wavelength'][i]),
                 pixel_size=pix,
                 frame_rate=rate,
-                description=dct['imaging_plane_description_b'],
-            ),
-            ImagingPlaneMetadata(
-                'V',
-                excitation=float(dct['exc_wavelength'][0]),
-                emission=float(dct['emi_wavelength']),
-                pixel_size=pix,
-                frame_rate=rate,
-                description=dct['imaging_plane_description_v'],
-            ),
+                description=dct[f'imaging_plane_description{i+1}'],
+            ) for i, chan in enumerate(channel_names)
         )
         return cls(
             location=loc,
@@ -327,14 +323,6 @@ def read_metadata_as_dict(h5file: PathLike) -> Dict[str, Any]:
             # assumes byte string
             return content[0].decode('utf-8')
 
-    def swap_key_(dct, key_old: str, key_new: str):
-        if (key_new not in dct.keys()) and (key_old in dct.keys()):
-            dct[key_new] = dct.pop(key_old)
-
-    def fill_(dct, key: str, default: Any):
-        if key not in dct.keys():
-            dct[key] = default
-
     def as_string_items_(entry: _h5.Dataset) -> Tuple[str]:
         content = _np.array(entry).ravel()
         return tuple(item.decode('utf-8') for item in content)
@@ -344,21 +332,6 @@ def read_metadata_as_dict(h5file: PathLike) -> Dict[str, Any]:
         metadata = dict((key.lower(), pythonify_(group[key])) for key in group.keys())
         metadata['bhv_raw_labels'] = as_string_items_(src['behavior_raw/label'])
         metadata['bhv_ds_labels']  = as_string_items_(src['behavior_ds/label'])
-
-    swap_key_(metadata, 'spiecies', 'species')
-    swap_key_(metadata, 'mouseid', 'subject_id')
-    swap_key_(metadata, 'dob', 'date_of_birth')
-    swap_key_(metadata, 'img_devicemanufacturer', 'img_device_manufacturer')
-    swap_key_(metadata, 'img_devicedescription', 'img_device_description')
-    swap_key_(metadata, 'imagingpixelsize', 'imaging_pixel_size')
-    swap_key_(metadata, 'imagingframerate', 'imaging_frame_rate')
-    swap_key_(metadata, 'imagingplane_descriptionb', 'imaging_plane_description_b')
-    swap_key_(metadata, 'imagingplane_descriptionv', 'imaging_plane_description_v')
-    swap_key_(metadata, 'bhv_devicemanufacturer', 'bhv_device_manufacturer')
-    swap_key_(metadata, 'bhv_devicedescription', 'bhv_device_description')
-    swap_key_(metadata, 'video_devicemanufacturer', 'video_device_manufacturer')
-    swap_key_(metadata, 'video_devicedescription', 'video_device_description')
-    fill_(metadata, 'description', '')
     return metadata
 
 
