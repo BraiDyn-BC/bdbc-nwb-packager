@@ -82,10 +82,22 @@ PathLike = _core.PathLike
 #     return trials
 
 
+# def load_trials(
+#     rawfile: PathLike,
+# ) -> _pd.DataFrame:
+#     raise NotImplementedError
+
 def load_trials(
     rawfile: PathLike,
 ) -> _pd.DataFrame:
-    raise NotImplementedError
+    with _h5.File(rawfile, 'r') as src:
+        # Loading from hdf5 file
+        data        = _np.array(src["behavior_raw/trial_info/data"], dtype=_np.float32).T
+        label       = _np.array(src["behavior_raw/trial_info/label"]).ravel()
+        label       = [lab.decode('utf-8') for lab in label]  # convert to utf-8
+        # convert to dataframe
+        trials_raw = _pd.DataFrame(data, columns=label)
+        return trials_raw
 
 
 def load_downsampled_trials(
@@ -99,6 +111,10 @@ def load_downsampled_trials(
         # convert to dataframe
         trials_ds = _pd.DataFrame(data, columns=label)
         return trials_ds
+
+
+
+
 
 
 # def format_trials(
