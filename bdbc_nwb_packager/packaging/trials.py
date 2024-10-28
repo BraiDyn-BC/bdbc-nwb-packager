@@ -20,7 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Union
+from typing import Union, Iterable, ClassVar, Dict, Generator
+from typing_extensions import Self
+from dataclasses import (
+    dataclass,
+)
 
 import numpy as _np
 import h5py as _h5
@@ -30,7 +34,7 @@ from pynwb.epoch import TimeIntervals as _TimeIntervals
 
 from .. import (
     stdio as _stdio,
-    trials as _trials,
+    # trials as _trials,   # UNUSED
 )
 from . import (
     core as _core,
@@ -38,6 +42,138 @@ from . import (
 
 
 PathLike = _core.PathLike
+
+# TODO: load the dictionary below from e.g. a JSON file in the future...
+CUED_LEVER_PULL = {
+    'columns': [
+        {
+            'name': 'trial_start',
+            'output_name': 'start_time',
+            'description': 'the timing of the cue onset',
+        },
+        {
+            'name': 'trial_end',
+            'output_name': 'stop_time',
+            'description': 'the timing when the trial outcome is determined',
+        },
+        {
+            'name': 'pull_onset',
+            'description': 'the timing when the animal started to pull the lever',
+        },
+        {
+            'name': 'reaction_time',
+            'description': "the time interval (in seconds) from the cue onset to when the animal started to pull the lever",
+        },
+        {
+            'name': 'pull_duration_for_success',
+            'description': 'the duration (in seconds) that the animal was required to pull the lever to obtain reward for the trial',
+        },
+        {
+            'name': 'trial_outcome',
+            'data_type': 'int',  # FIXME
+            'description': 'the outcome of the trial',
+        }
+    ]
+}
+
+
+FieldType = Union[str, int, float]
+
+
+def parse_data_type(typespec: str) -> type:
+    if typespec == 'str':
+        return str
+    elif typespec == 'int':
+        return int
+    elif typespec == 'float':
+        return float
+    else:
+        raise ValueError(f"expected one of ('str', 'int', 'float'), got {repr(typespec)}")
+
+
+@dataclass
+class ColumnSpec:
+    input_name: str
+    output_name: str
+    data_type: type = float
+    description: str = ''
+
+    @property
+    def name(self):
+        return self.output_name
+
+    def get_value_from(self, row: Dict[str, FieldType]) -> FieldType:
+        return self.data_type(row[self.input_name])
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            'input_name': self.input_name,
+            'output_name': self.output_name,
+            'data_type': self.data_type.__name__,
+            'description': self.description,
+        }
+
+    @classmethod
+    def from_dict(cls, dct: Dict[str, str]) -> Self:
+        return cls(
+            input_name=str(dct['name']),
+            output_name=str(dct.get('output_name', dct['name'])),
+            data_type=parse_data_type(str(dct.get('data_type', 'float'))),
+            description=str(dct.get('description', ''))
+        )
+
+
+@dataclass
+class TrialSpec:
+    columns: Iterable[ColumnSpec] = ()
+    REQUIRED_COLUMNS: ClassVar[Iterable[str]] = ('start_time', 'stop_time')
+
+    def __post_init__(self):
+        self.columns = tuple(self.columns)
+        if (len(self.columns) == 0) or any(
+            col not in self.column_names for col in self.REQUIRED_COLUMNS
+        ):
+            raise ValueError('at least two columns (`start_time` and `stop_time`) are needed')
+
+    @property
+    def column_names(self) -> Iterable[str]:
+        return tuple(col.name for col in self.columns)
+
+    @property
+    def required_columns(self) -> Generator[ColumnSpec, None, None]:
+        for column in self.columns:
+            if column.name in self.REQUIRED_COLUMNS:
+                yield column
+
+    @property
+    def task_specific_columns(self) -> Generator[ColumnSpec, None, None]:
+        for column in self.columns:
+            if column.name in self.REQUIRED_COLUMNS:
+                continue
+            yield column
+
+    def iter_trials_from(
+        self,
+        trials: _pd.DataFrame
+    ) -> Generator[Dict[str, FieldType], None, None]:
+        for _, row in trials.iterrows():
+            row = row.to_dict()
+            yield dict((col.name, col.get_value_from(row)) for col in self.columns)
+
+    def to_dict(self) -> Dict[str, Union[str, Iterable[Dict[str, str]]]]:
+        return {
+            'columns': tuple(column.to_dict() for column in self.columns),
+        }
+
+    @classmethod
+    def from_dict(cls, dct: Dict[str, Union[str, Iterable[Dict[str, str]]]]) -> Self:
+        return cls(
+            columns=tuple(ColumnSpec.from_dict(spec) for spec in dct.get('columns', ())),
+        )
+
+
+TASK_TYPES = dict()
+TASK_TYPES['cued_lever_pull'] = TrialSpec.from_dict(CUED_LEVER_PULL)
 
 
 # def index_to_timestamp(
@@ -113,10 +249,6 @@ def load_downsampled_trials(
         return trials_ds
 
 
-
-
-
-
 # def format_trials(
 #     trials: _pd.DataFrame,
 #     tasktype: str = 'cued_lever_pull',
@@ -141,7 +273,10 @@ def write_trials(
     tasktype: str = 'cued_lever_pull',
     verbose: bool = True,
 ):
-    task = getattr(_trials, tasktype)
+    trial_spec: TrialSpec = TASK_TYPES.get(tasktype, None)
+    if trial_spec is None:
+        raise ValueError(f"unknown task type: {tasktype}")
+
     if isinstance(parent, _nwb.NWBFile):
         table = None
         _add_column = parent.add_trial_column
@@ -162,15 +297,10 @@ def write_trials(
         def _finalize(tab):
             parent.add(tab)
 
-    for name, desc in task.DESCRIPTION.items():
-        _add_column(name=name, description=desc)
+    for column in trial_spec.task_specific_columns:
+        _add_column(name=column.name, description=column.description)
 
-    # formatted = format_trials(trials, tasktype=tasktype)
-
-    # for _, row in formatted.iterrows():
-    for _, row in trials.iterrows():
-        _add_row(
-            **row.to_dict(),
-        )
+    for trial in trial_spec.iter_trials_from(trials):
+        _add_row(**trial)
     _finalize(table)
     _stdio.message("done registration of trials.", verbose=verbose)

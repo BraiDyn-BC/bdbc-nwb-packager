@@ -112,9 +112,6 @@ def package_nwb(
         # add trials
         trials = _trials.load_trials(
             paths.source.rawdata,
-            timebases,
-            tasktype=tasktype,
-            verbose=verbose,
         )
         _trials.write_trials(
             nwbfile,
@@ -211,15 +208,8 @@ def package_nwb(
 
         if trials is not None:
             trials_ds = _trials.load_downsampled_trials(
-                trials,
-                timebases,
-                tasktype=tasktype,
-                verbose=verbose
+                paths.source.rawdata
             )
-            # _load_downsampled_trialsを書き換えて読み込んでDF出力をつくる
-            # trials_ds = _trials._load_downsampled_trials(
-            #     rawfile = paths.source.rawdata
-            # )
             _trials.write_trials(
                 ds,
                 trials_ds,
@@ -252,6 +242,8 @@ def package_nwb(
 
     with _warnings.catch_warnings():
         _warnings.simplefilter('ignore', category=_DtypeConversionWarning)
+        if not outfile.parent.exists():
+            outfile.parent.mkdir(parents=True)
         with _nwb.NWBHDF5IO(
             outfile,
             mode="w",

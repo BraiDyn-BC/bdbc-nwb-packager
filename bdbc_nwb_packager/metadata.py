@@ -208,7 +208,7 @@ class ImagingMetadata(_namedtuple('ImagingMetadata', (
             dct['exc_order1'].upper(),
             dct['exc_order2'].upper(),
         )
-        chans = (
+        chans = tuple(
             ImagingPlaneMetadata(
                 chan,
                 excitation=float(dct['exc_wavelength'][i]),
