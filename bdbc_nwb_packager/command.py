@@ -99,3 +99,4 @@ def batch_package_nwb(args=None):
     else:
         specs = vars(parser.parse_args(args))
     _batch.run_batch(**specs)
+

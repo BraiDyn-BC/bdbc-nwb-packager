@@ -69,6 +69,7 @@ def run_batch(
         todate=todate,
         type=type,
         sessions_root_dir=sessroot,
+        verbose=verbose,
     ):
         _stdio.message(f"[{sess.batch}/{sess.animal} {sess.longdate} ({sess.longtype})]", verbose=verbose)
         if not sess.has_rawdata():
@@ -151,6 +152,7 @@ def filter_sessions(
     todate: Optional[str] = None,
     type: Optional[str] = None,
     sessions_root_dir: Optional[PathLike] = None,
+    verbose: bool = True
 ) -> Generator[_sessx.Session, None, None]:
     is_animal = matcher.animal(animal)
     is_date = matcher.date(from_date=fromdate, to_date=todate)
@@ -160,8 +162,16 @@ def filter_sessions(
         return is_animal(session.animal) and is_date(session.date) and is_type(session.type)
 
     sessions_root_dir = _paths.sessions_root_dir(sessions_root_dir)
-    yield from (sess for sess in _sessx.iterate_sessions(sessions_root_dir)
-                if _matches(sess))
+    _stdio.message(f"...SESSIONS_ROOT_DIR={repr(str(sessions_root_dir))}", verbose=verbose)
+    if not sessions_root_dir.exists():
+        _stdio.message(f"***session directory not found: {str(sessions_root_dir)}", verbose=True)
+    found = 0
+    for sess in _sessx.iterate_sessions(sessions_root_dir):
+        found += 1
+        if _matches(sess):
+            yield sess
+    if found == 0:
+        _stdio.message("***no sessions found (maybe inappropriate session directory setting?)", verbose=True)
 
 
 class matcher:

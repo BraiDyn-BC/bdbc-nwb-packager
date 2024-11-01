@@ -81,7 +81,7 @@ def configure_nwb_file(
 
 def package_nwb(
     paths: _paths.PathSettings,
-    tasktype: str = 'cued_lever_pull',
+    tasktype: str = 'cued-lever-pull',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
@@ -89,11 +89,10 @@ def package_nwb(
     override_metadata: Optional[Dict[str, None]] = None,
     overwrite: bool = False,
     verbose: bool = True,
-) -> _nwb.NWBFile:
+) -> Optional[_nwb.NWBFile]:
     outfile = paths.destination.nwb
     if outfile.exists() and (not overwrite):
         _stdio.message(f"***file already exists: '{outfile}'", verbose=verbose)
-        # FIXME: load the contents from the file to return
         return
 
     metadata = _metadata.metadata_from_rawdata(
@@ -101,35 +100,53 @@ def package_nwb(
         paths.source.rawdata,
         override=override_metadata,
     )
+    triggers, timebases = _core.load_timebases(metadata, paths.source.rawdata)
+
+    # pulse number validation
+    triggers, timebases = _core.validate_timebase_with_imaging(
+            paths.source.rawdata, triggers, timebases)
+    triggers, timebases = _core.validate_timebase_with_videos(
+            paths, triggers, timebases)
+    has_videos = (timebases.videos is not None)
+
     nwbfile = configure_nwb_file(metadata)
 
     # raw DAQ data
-    triggers, timebases = _core.load_timebases(metadata, paths.source.rawdata)
     for ts in _daq.iterate_raw_daq_recordings(metadata, paths.source.rawdata, timebases):
         nwbfile.add_acquisition(ts)
 
-    if paths.session.type == 'task':
-        # add trials
-        trials = _trials.load_trials(
-            paths.source.rawdata,
-        )
+    # try adding trials
+
+    # FIXME: override the "task type"
+    # to correctly identify the columns
+    # upon `write_trials`
+    # (there may be a better way, though...)
+    if paths.session.type != 'task':
+        tasktype = paths.session.type
+    trials = _trials.load_trials(
+        paths.source.rawdata,
+    )
+    if trials is not None:
         _trials.write_trials(
             nwbfile,
             trials,
             tasktype=tasktype,
             verbose=verbose,
         )
+        _stdio.message(f"done registering {trials.shape[0]} trials", verbose=verbose)
     else:
-        trials = None
+        _stdio.message('***no trials to be processed', verbose=True)
 
-    _videos.write_videos(
-        nwbfile=nwbfile,
-        metadata=metadata,
-        timebases=timebases,
-        paths=paths,
-        copy_files=copy_videos,
-        verbose=verbose,
-    )
+    # add behavior videos
+    if has_videos:
+        _videos.write_videos(
+            nwbfile=nwbfile,
+            metadata=metadata,
+            timebases=timebases,
+            paths=paths,
+            copy_files=copy_videos,
+            verbose=verbose,
+        )
 
     # imaging data
     frames = _imaging.load_imaging_data(
@@ -163,7 +180,8 @@ def package_nwb(
     else:
         _stdio.message('***skip registering ROI data', verbose=verbose)
 
-    if paths.has_behavior_videos():
+    # pose tracking
+    if has_videos:
         # DLC results / pupil
         behav = nwbfile.create_processing_module(
             name="behavior", description="Processed behavioral data"
@@ -190,6 +208,7 @@ def package_nwb(
                 behav.add(tracking)
             _stdio.message("done.", verbose=verbose)
     else:
+        _stdio.message('***no behavior videos to be processed', verbose=verbose)
         behav = None
 
     # downsampled DAQ data
@@ -253,3 +272,4 @@ def package_nwb(
 
     _stdio.message(f"saved NWB file to: '{outfile}'", verbose=verbose)
     return nwbfile
+

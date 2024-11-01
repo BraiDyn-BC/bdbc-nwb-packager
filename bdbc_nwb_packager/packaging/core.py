@@ -29,6 +29,7 @@ import numpy.typing as _npt
 import h5py as _h5
 
 from .. import (
+    stdio as _stdio,
     metadata as _metadata,
     paths as _paths,
 )
@@ -85,9 +86,15 @@ def load_timebases(
         # need to subtract 1 to convert to the Python format indices
         imgB = _np.array(src["sync_pulse/img_acquisition_start_b"], dtype=_np.uint32).ravel() - 1
         imgV = _np.array(src["sync_pulse/img_acquisition_start_v"], dtype=_np.uint32).ravel() - 1
-        videoPulse = _np.array(src["sync_pulse/vid_acquisition_start"], dtype=_np.uint32).ravel() - 1
 
-        # TODO: check other entries
+        if 'vid_acquisition_start' in src['sync_pulse'].keys():
+            videoPulse = _np.array(src["sync_pulse/vid_acquisition_start"], dtype=_np.uint32).ravel() - 1
+            videoTime  = _np.array(src["tick_in_second/vid"], dtype=_np.float32).ravel()
+        else:
+            _stdio.message('***found no video pulses', verbose=True)
+            videoPulse = None
+            videoTime  = None
+
         trigs = PulseTriggers(
             videos=videoPulse,
             B=imgB,
@@ -95,8 +102,58 @@ def load_timebases(
         )
         timebase = Timebases(
             raw=_np.array(src["tick_in_second/raw"], dtype=_np.float32).ravel(),
-            videos=_np.array(src["tick_in_second/vid"], dtype=_np.float32).ravel(),
+            videos=videoTime,
             B=_np.array(src["tick_in_second/img_b"], dtype=_np.float32).ravel(),
             V=_np.array(src["tick_in_second/img_v"], dtype=_np.float32).ravel(),
         )
         return trigs, timebase
+
+
+def validate_timebase_with_imaging(
+    rawfile: PathLike,
+    triggers: PulseTriggers,
+    timebases: Timebases,
+    verbose: bool = True,
+) -> Tuple[PulseTriggers, Timebases]:
+    num_frames = dict()
+    with _h5.File(rawfile, 'r') as src:
+        num_frames['B'] = src['image/Ib'].shape[0]
+        num_frames['V'] = src['image/Iv'].shape[0]
+
+    for chan in num_frames.keys():
+        pulses = getattr(triggers, chan)
+        timebase = getattr(timebases, chan)
+
+        num_pulses = pulses.size
+        if num_pulses < num_frames[chan]:
+            raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of pulses ({num_pulses})")
+        elif num_pulses > num_frames[chan]:
+            _stdio.message(f"--> trimming {chan} pulses: {num_pulses} --> {num_frames[chan]}")
+            triggers = triggers._replace(**{chan: pulses[:num_frames[chan]]})
+        else:
+            pass
+
+        num_ticks = timebase.size
+        if num_ticks < num_frames[chan]:
+            raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of ticks ({num_ticks})")
+        elif num_ticks > num_frames[chan]:
+            _stdio.message(f"--> trimming {chan} ticks: {num_ticks} --> {num_frames[chan]}")
+            timebases = timebases._replace(**{chan: timebase[:num_frames[chan]]})
+        else:
+            pass
+
+    return (triggers, timebases)
+
+
+def validate_timebase_with_videos(
+    paths: _paths.PathSettings,
+    triggers: PulseTriggers,
+    timebases: Timebases,
+    tolerance: int = 1,
+    verbose: bool = True,
+) -> Tuple[PulseTriggers, Timebases]:
+    if not paths.has_behavior_videos():
+        triggers = triggers._replace(videos=None)
+        timebases = timebases._replace(videos=None)
+    return (triggers, timebases)
+

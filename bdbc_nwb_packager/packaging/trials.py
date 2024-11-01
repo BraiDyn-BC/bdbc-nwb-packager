@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Union, Iterable, ClassVar, Dict, Generator
+from typing import Optional, Union, Iterable, ClassVar, Dict, Generator
 from typing_extensions import Self
 from dataclasses import (
     dataclass,
@@ -74,6 +74,26 @@ CUED_LEVER_PULL = {
             'description': 'the outcome of the trial',
         }
     ]
+}
+
+SENSORY_STIM = {
+    'columns': [
+        {
+            'name': 'trial_start',
+            'output_name': 'start_time',
+            'description': 'the timing of the stimulus onset',
+        },
+        {
+            'name': 'trial_end',
+            'output_name': 'stop_time',
+            'description': 'the timing of the stimulus offset',
+        },
+        {
+            'name': 'stim_modality',
+            'data_type': 'int', # FIXME
+            'description': "the modality of the stimulus: `visual (1)`, a flash of LED in front of the animal's eye; `auditory (2)`, a brief buzz of white noise from the speaker on the front-left side of the animal; `somatosensory (3)`, a brief vibration to the right whisker-pad of the animal"
+        }
+    ],
 }
 
 
@@ -173,7 +193,8 @@ class TrialSpec:
 
 
 TASK_TYPES = dict()
-TASK_TYPES['cued_lever_pull'] = TrialSpec.from_dict(CUED_LEVER_PULL)
+TASK_TYPES['cued-lever-pull'] = TrialSpec.from_dict(CUED_LEVER_PULL)
+TASK_TYPES['sensory-stim'] = TrialSpec.from_dict(SENSORY_STIM)
 
 
 # def index_to_timestamp(
@@ -225,14 +246,18 @@ TASK_TYPES['cued_lever_pull'] = TrialSpec.from_dict(CUED_LEVER_PULL)
 
 def load_trials(
     rawfile: PathLike,
-) -> _pd.DataFrame:
+) -> Optional[_pd.DataFrame]:
     with _h5.File(rawfile, 'r') as src:
         # Loading from hdf5 file
-        data        = _np.array(src["behavior_raw/trial_info/data"], dtype=_np.float32).T
-        label       = _np.array(src["behavior_raw/trial_info/label"]).ravel()
-        label       = [lab.decode('utf-8') for lab in label]  # convert to utf-8
+        data   = _np.array(src["behavior_raw/trial_info/data"], dtype=_np.float32).T
+        labels = _np.array(src["behavior_raw/trial_info/label"]).ravel()
+        labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
+
+        if data.shape[0] == 0:
+            return None
+
         # convert to dataframe
-        trials_raw = _pd.DataFrame(data, columns=label)
+        trials_raw = _pd.DataFrame(data, columns=labels)
         return trials_raw
 
 
@@ -303,4 +328,4 @@ def write_trials(
     for trial in trial_spec.iter_trials_from(trials):
         _add_row(**trial)
     _finalize(table)
-    _stdio.message("done registration of trials.", verbose=verbose)
+

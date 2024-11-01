@@ -104,5 +104,5 @@ def write_videos(
         entries[view] = entry
 
     _stdio.message("done registering the video files.", verbose=verbose)
-
     return VideoEntries(**entries)
+
