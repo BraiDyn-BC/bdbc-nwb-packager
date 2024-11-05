@@ -49,7 +49,7 @@ def run_batch(
     override_metadata: Optional[str] = None,
     overwrite: bool = False,
     verbose: bool = True,
-    tasktype: str = 'cued_lever_pull',
+    tasktype: str = 'cued-lever-pull',
     sessroot: Optional[PathLike] = None,
     rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
