@@ -20,40 +20,41 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Callable, Tuple
+from typing import Callable, ClassVar
 from typing_extensions import Self
 from pathlib import Path
-from collections import namedtuple as _namedtuple
+from dataclasses import dataclass
 
 import numpy as _np
 import numpy.typing as _npt
 import pandas as _pd
 
-VALIDATION_ALPHA = 2.5  # must be smaller (e.g. 0.5)
-VALIDATION_THRESHOLD = 0.88  # must be higher (e.g. 0.9999)
+VALIDATION_ALPHA = _np.nan  # must be smaller (e.g. 0.5)
+VALIDATION_THRESHOLD = 0.2  # must be higher (e.g. 0.9999)
 
 
-class PointEstimation(_namedtuple('PointEstimation', (
-    'x',
-    'y',
-))):
+@dataclass
+class PointEstimation:
+    x: _npt.NDArray[_np.floating]
+    y: _npt.NDArray[_np.floating]
+    AXES: ClassVar[tuple[str]] = ('x', 'y')
+
     def apply(
         self,
         fn: Callable[[_npt.NDArray], _npt.NDArray]
     ) -> Self:
         return self.__class__(
-            **dict((fld, fn(val)) for fld, val in zip(self._fields, self))
+            **dict((ax, fn(getattr(self, ax))) for ax in self.AXES)
         )
 
     def stack(self, axis: int = 1) -> _npt.NDArray:
         return _np.stack(self, axis=axis)
 
 
-class IndexRanges(_namedtuple('IndexRanges', (
-    'pulses',
-    'frames',
-))):
-    pass
+@dataclass
+class IndexRanges:
+    pulses: slice
+    frames: slice
 
 
 def validate_keypoint(
@@ -63,10 +64,13 @@ def validate_keypoint(
     threshold: float = VALIDATION_THRESHOLD,
 ) -> PointEstimation:
     def _by_percentile(v):
-        return _np.logical_and(
-            v >= _np.nanpercentile(v, alpha),
-            v <= _np.nanpercentile(v, 100 - alpha),
-        )
+        if _np.isnan(alpha):
+            return v
+        else:
+            return _np.logical_and(
+                v >= _np.nanpercentile(v, alpha),
+                v <= _np.nanpercentile(v, 100 - alpha),
+            )
     scorer = dlcdata.columns[0][0]
     x = _np.array(dlcdata[scorer, keypoint, 'x'].values)
     y = _np.array(dlcdata[scorer, keypoint, 'y'].values)
@@ -89,7 +93,7 @@ def validate_keypoint(
 def validate_index_ranges(
     num_frames: int,
     num_pulses: int,
-    mismatch_tolerance: int = 1
+    mismatch_tolerance: int = 0
 ) -> IndexRanges:
     """a temporary solution until sizes of timebases/videos are more nicely handled."""
     delta = num_frames - num_pulses
@@ -113,16 +117,13 @@ def prepare_table_results(
     t_video: _npt.NDArray[_np.floating],
     triggers: _npt.NDArray[_np.integer],
     entry_path: str = 'df_with_missing',
-    mismatch_tolerance: int = 1,
-) -> Tuple[_npt.NDArray[_np.floating], _npt.NDArray[_np.integer], _pd.DataFrame]:
-    # FIXME: this procedure must be (formally)
-    # during registration of videos
+    mismatch_tolerance: int = 0,
+) -> tuple[_npt.NDArray[_np.floating], _npt.NDArray[_np.integer], _pd.DataFrame]:
     tclip, vclip = validate_index_ranges(
         num_frames=srcvideo.num_frames,
         num_pulses=t_video.size,
         mismatch_tolerance=mismatch_tolerance,
     )
-
     tab = _pd.read_hdf(tabpath, key=entry_path)
     tab = tab.iloc[vclip]
     t = t_video[tclip]

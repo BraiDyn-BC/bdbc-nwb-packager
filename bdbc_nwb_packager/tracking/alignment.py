@@ -20,86 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Callable, Dict
+from typing import Callable
 import warnings as _warnings
 
 import numpy as _np
 import numpy.typing as _npt
-import pandas as _pd
-
-
-def timebase_to_daqindices(
-    daq_t: _npt.NDArray[_np.floating],
-    pulse_t: _npt.NDArray[_np.floating],
-    tol: float = 1e-6,
-) -> _npt.NDArray[_np.int32]:
-    """better directly using the PulseTriggers instances"""
-    out = _np.empty((pulse_t.size,), dtype=_np.int32)
-    out.fill(-1)
-    daqsize = daq_t.size
-    offset = 0
-    for i, pulsetrig in enumerate(pulse_t):
-        while (offset < daqsize) and (abs(pulsetrig - daq_t[offset]) > tol):
-            offset += 1
-        if offset == daqsize:
-            break
-        out[i] = offset
-    return out
-
-
-def daqindex_to_pulseindex(
-    daqidxx: _npt.NDArray[_np.integer],
-    daq_t: _npt.NDArray[_np.floating],
-    pulse_t: _npt.NDArray[_np.floating],
-) -> _npt.NDArray[_np.int32]:
-    """`daqidxx assumed to be sorted in the ascending order,
-    except for entries with -1, which indicates that the value
-    is missing there.
-
-    the returning array will contain -2, which indicates
-    "out of the period where pulses are defined".
-    """
-    out = _np.empty(daqidxx.size, dtype=_np.int32)
-    out.fill(-2)
-    pulsesiz = pulse_t.size
-    offset = 0
-    for i, daqidx in enumerate(daqidxx):
-        if daqidx == -1:
-            out[i] = -1
-            continue
-
-        daqtrig = daq_t[daqidx]
-        while ((offset + 1) < pulsesiz) and (pulse_t[offset + 1] < daqtrig):
-            offset += 1
-        if offset == 0:
-            # before the beginning of the pulses
-            continue
-        elif offset == (pulsesiz - 1):
-            # at the end of the pulses
-            break
-        out[i] = offset
-    return out
-
-
-def align_trials_to_pulses(
-    trials: _pd.DataFrame,
-    daq_t: _npt.NDArray[_np.floating],
-    pulse_t: _npt.NDArray[_np.floating],
-    columnsettings: Dict[str, str]
-) -> _pd.DataFrame:
-    for required in ('start', 'end'):
-        if required not in columnsettings.keys():
-            raise ValueError(f"trials do not contain the '{required}' column")
-    aligned = dict()
-    for col, typ in columnsettings.items():
-        if typ == 'time':
-            aligned[col] = daqindex_to_pulseindex(trials[col].values, daq_t, pulse_t)
-        elif typ == 'value':
-            aligned[col] = trials[col].values
-        else:
-            raise ValueError(f"unexpected column type: {typ}")
-    aligned = _pd.DataFrame(data=aligned)
-    return aligned.loc[~_np.logical_or(aligned.start == -2, aligned.end == -2)]
 
 
 def upsample(

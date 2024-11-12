@@ -19,21 +19,46 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+"""(data-)classes and procedures related to the handling of NWB metadata"""
+
 from importlib import reload as _reload  # DEBUG
 
 from . import (
-    configs,
-    spec,
-    io,
+    common,
+    devices,
+    session,
+    recording,
+    rois,
+    highlevel,
 )
 
-_reload(configs)  # DEBUG
-_reload(spec)  # DEBUG
-_reload(io)  # DEBUG
+_reload(common)  # DEBUG
+_reload(devices)  # DEBUG
+_reload(session)  # DEBUG
+_reload(recording)  # DEBUG
+_reload(rois)  # DEBUG
+_reload(highlevel)  # DEBUG
 
-ColumnSpec = spec.ColumnSpec
-TrialSpec = spec.TrialSpec
+# error types
+MetadataParseError = common.MetadataParseError
 
-load_trials = io.load_trials
-load_downsampled_trials = io.load_downsampled_trials
-write_trials = io.write_trials
+# exported classes (by submodule)
+DeviceMetadata = devices.DeviceMetadata
+BehaviorVideosMetadata = devices.BehaviorVideosMetadata
+
+SessionMetadata = session.SessionMetadata
+SubjectMetadata = session.SubjectMetadata
+
+TaskRecordingMetadata = recording.TaskRecordingMetadata
+ImagingPlaneMetadata = recording.ImagingPlaneMetadata
+ImagingMetaData = recording.ImagingMetadata
+
+SingleROIMetadata = rois.SingleROIMetadata
+ROISetMetadata = rois.ROISetMetadata
+
+Metadata = highlevel.Metadata
+
+# exported procedures
+read_metadata_as_dict = common.read_metadata_as_dict
+read_recordings_metadata = highlevel.read_recordings_metadata
+read_roi_metadata = highlevel.read_roi_metadata

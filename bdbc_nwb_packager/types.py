@@ -19,21 +19,17 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from importlib import reload as _reload  # DEBUG
+"""the common, too-often-used types and functions."""
 
-from . import (
-    configs,
-    spec,
-    io,
-)
+from typing import Optional, Union, Iterable
+from pathlib import Path
 
-_reload(configs)  # DEBUG
-_reload(spec)  # DEBUG
-_reload(io)  # DEBUG
+PathLike = Union[str, Path]
+PathsLike = Union[PathLike, Iterable[PathLike]]
 
-ColumnSpec = spec.ColumnSpec
-TrialSpec = spec.TrialSpec
 
-load_trials = io.load_trials
-load_downsampled_trials = io.load_downsampled_trials
-write_trials = io.write_trials
+def maybe_path(path: Optional[PathLike]) -> Optional[Path]:
+    if path is None:
+        return None
+    else:
+        return Path(path)

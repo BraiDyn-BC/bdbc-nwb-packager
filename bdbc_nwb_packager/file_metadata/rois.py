@@ -19,21 +19,33 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from importlib import reload as _reload  # DEBUG
+"""ROI-related metadata structures."""
+from dataclasses import dataclass
 
-from . import (
-    configs,
-    spec,
-    io,
-)
+import numpy.typing as _npt
+import pandas as _pd
 
-_reload(configs)  # DEBUG
-_reload(spec)  # DEBUG
-_reload(io)  # DEBUG
 
-ColumnSpec = spec.ColumnSpec
-TrialSpec = spec.TrialSpec
+@dataclass
+class SingleROIMetadata:
+    name: str
+    mask: _npt.NDArray[bool]
+    description: str
 
-load_trials = io.load_trials
-load_downsampled_trials = io.load_downsampled_trials
-write_trials = io.write_trials
+    def __repr__(self) -> str:
+        return f"SingleROIMetadata(name='{self.name}', ...)"
+
+
+@dataclass
+class ROISetMetadata:
+    transform: _npt.NDArray
+    rois: tuple[SingleROIMetadata]
+
+    def transform_as_table(self) -> _pd.DataFrame:
+        tab = _pd.DataFrame(data={
+            'x_in': self.transform[:, 0],
+            'y_in': self.transform[:, 1],
+            'c_in': self.transform[:, 2],
+        })
+        tab.index = ['x_out', 'y_out']
+        return tab

@@ -20,38 +20,58 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from importlib import reload as _reload
+from importlib import reload as _reload  # DEBUG
 
 from . import (
     stdio,
-    paths,
-    metadata,
+    types,
+    configure,
+    file_metadata,
+    timebases,
+    daq,
     trials,
-    validation,
-    alignment,
+    videos,
+    imaging,
+    rois,
+    tracking,
     packaging,
     batch,
 )
 
-_reload(stdio)
-_reload(paths)
-_reload(metadata)
-_reload(trials)
-_reload(validation)
-_reload(alignment)
-_reload(packaging)
-_reload(batch)
+_reload(stdio)  # DEBUG
+_reload(types)  # DEBUG
+_reload(configure)  # DEBUG
+_reload(file_metadata)  # DEBUG
+_reload(timebases)  # DEBUG
+_reload(daq)  # DEBUG
+_reload(trials)  # DEBUG
+_reload(videos)  # DEBUG
+_reload(imaging)  # DEBUG
+_reload(rois)  # DEBUG
+_reload(tracking)  # DEBUG
+_reload(packaging)  # DEBUG
+_reload(batch)  # DEBUG
 
-PathSettings = paths.PathSettings
-Metadata = metadata.Metadata
-ROISetMetadata = metadata.ROISetMetadata
-ImagingData = packaging.ImagingData
-SingleROISignal = packaging.SingleROISignal
+# classes
+PathSettings = configure.PathSettings
 
-sessions_root_dir = paths.sessions_root_dir
-setup_path_settings = paths.setup_path_settings
-metadata_from_rawdata = metadata.metadata_from_rawdata
-read_roi_metadata = metadata.read_roi_metadata
-package_nwb = packaging.package_nwb
+Metadata = file_metadata.Metadata
+ROISetMetadata = file_metadata.ROISetMetadata
+
+Timebases = timebases.Timebases
+PulseTriggers = timebases.PulseTriggers
+
+# procedures
+setup_path_settings = configure.setup_path_settings
+
+read_recordings_metadata = file_metadata.read_recordings_metadata
+read_roi_metadata = file_metadata.read_roi_metadata
+
+read_timebases = timebases.read_timebases
+
+iterate_raw_daq_recordings = daq.iterate_raw_daq_recordings
+iterate_downsampled_daq_recordings = daq.iterate_downsampled_daq_recordings
+
+process = packaging.process
 
 run_batch = batch.run_batch

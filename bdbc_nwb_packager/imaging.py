@@ -19,11 +19,10 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-from typing import Dict
+from typing import ClassVar, Optional
 from typing_extensions import Self
 from pathlib import Path
-from collections import namedtuple as _namedtuple
+from dataclasses import dataclass
 from time import time as _now
 
 import numpy as _np
@@ -33,56 +32,54 @@ import pynwb as _nwb
 from tifffile import TiffWriter as _TiffWriter
 from tqdm import tqdm as _tqdm
 
-from .. import (
-    stdio as _stdio,
-    paths as _paths,
-    metadata as _metadata,
-)
+from .types import PathLike
 from . import (
-    core as _core,
+    stdio as _stdio,
+    configure as _configure,
+    file_metadata as _file_metadata,
+    timebases as _timebases,
 )
 
-PathLike = _core.PathLike
 
+@dataclass
+class ImagingData:
+    time: _npt.NDArray[_np.floating]
+    B: Optional[_npt.NDArray[_np.floating]]
+    V: Optional[_npt.NDArray[_np.floating]]
+    CHANNELS: ClassVar[tuple[str]] = ('B', 'V')
 
-class ImagingData(_namedtuple('ImagingData', (
-    'time',
-    'B',
-    'V',
-))):
+    def has_data(self) -> bool:
+        return all((getattr(self, ch) is not None) for ch in self.CHANNELS)
+
     def flatten(self, verbose: bool = True) -> Self:
         if self.B.ndim == 2:
             return self
         _stdio.message("flattening", end=' ', verbose=verbose)
-        data = dict()
+        data = dict(time=self.time)
         start = _now()
-        for fld in self._fields:
-            if fld == 'time':
-                data[fld] = getattr(self, fld)
-            else:
-                _stdio.message(f"{fld} frames...", end=' ', verbose=verbose)
-                frames = getattr(self, fld)
-                data[fld] = frames.reshape((frames.shape[0], -1))
+        for fld in self.CHANNELS:
+            _stdio.message(f"{fld} frames...", end=' ', verbose=verbose)
+            frames = getattr(self, fld)
+            data[fld] = frames.reshape((frames.shape[0], -1))
         stop = _now()
         _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
         return self.__class__(**data)
 
 
-class NWBImagingSetup(_namedtuple('NWBImagingSetup', (
-    'device',
-    'acquisition',  # Optical channel
-    'B',  # imaging plane
-    'V',  # imaging plane
-))):
-    pass
+@dataclass
+class NWBImagingSetup:
+    device: object  # TODO
+    acquisition: object  # TODO
+    B: object  # TODO
+    V: object  # TODO
 
 
 def load_imaging_data(
     rawfile: PathLike,
-    timebases: _core.Timebases,
+    timebases: _timebases.Timebases,
     read_frames: bool = True,
     verbose: bool = True
-) -> Dict[str, _npt.NDArray[_np.float32]]:
+) -> ImagingData:
     if read_frames:
         with _h5.File(rawfile, 'r') as src:
             start = _now()
@@ -99,7 +96,7 @@ def load_imaging_data(
 
 
 def setup_imaging_device(
-    metadata: _metadata.Metadata,
+    metadata: _file_metadata.Metadata,
     nwbfile: _nwb.NWBFile,
     verbose: bool = True,
 ) -> NWBImagingSetup:
@@ -109,9 +106,9 @@ def setup_imaging_device(
         manufacturer=metadata.imaging.device.manufacturer,
     )
     acq = _nwb.ophys.OpticalChannel(
-        name="OpticalChannel",
-        description="an optical channel",  # FIXME: need description
-        emission_lambda=metadata.imaging.B.emission,  # NOTE: common between the frames
+        name='LongpassFilter',
+        description='535 nm long-pass filtered fluorescence',
+        emission_lambda=metadata.imaging.B.emission,
     )
 
     # blue channel
@@ -156,7 +153,7 @@ def setup_imaging_device(
 
 def write_imaging_data(
     nwbfile: _nwb.NWBFile,
-    destination: _paths.DestinationPaths,
+    destination: _configure.DestinationPaths,
     frames: ImagingData,
     setup: NWBImagingSetup,
     write_frames: bool = True,
@@ -164,7 +161,7 @@ def write_imaging_data(
 ):
     outfiles = destination.imaging
     if write_frames:
-        for chan in ('B', 'V'):
+        for chan in frames.CHANNELS:
             outfile = Path(getattr(outfiles, chan))
             if not outfile.parent.exists():
                 outfile.parent.mkdir(parents=True)
@@ -183,7 +180,7 @@ def write_imaging_data(
     start = _now()
     sig_B = _nwb.ophys.OnePhotonSeries(
         name='widefield_blue',
-        description='widefield imaging data, blue channel',
+        description='widefield imaging data, blue excitation',
         imaging_plane=setup.B,
         unit="n.a.",
         external_file=[str(relfiles.B)],
@@ -193,7 +190,7 @@ def write_imaging_data(
     )
     sig_V = _nwb.ophys.OnePhotonSeries(
         name='widefield_UV',
-        description='widefield imaging data, UV channel',
+        description='widefield imaging data, UV excitation',
         imaging_plane=setup.V,
         unit="n.a.",
         external_file=[str(relfiles.V)],

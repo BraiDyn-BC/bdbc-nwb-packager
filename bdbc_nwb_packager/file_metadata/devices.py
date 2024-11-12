@@ -19,21 +19,34 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from importlib import reload as _reload  # DEBUG
+"""device-related metadata structures."""
 
-from . import (
-    configs,
-    spec,
-    io,
-)
+from typing import ClassVar
+from typing_extensions import Self
+from dataclasses import dataclass
 
-_reload(configs)  # DEBUG
-_reload(spec)  # DEBUG
-_reload(io)  # DEBUG
+from .common import JSONLike
 
-ColumnSpec = spec.ColumnSpec
-TrialSpec = spec.TrialSpec
 
-load_trials = io.load_trials
-load_downsampled_trials = io.load_downsampled_trials
-write_trials = io.write_trials
+@dataclass
+class DeviceMetadata:
+    name: str
+    manufacturer: str
+    description: str
+
+
+@dataclass
+class BehaviorVideosMetadata(DeviceMetadata):
+    RATE: ClassVar[float] = 120.0
+
+    @property
+    def rate(self) -> float:
+        return self.RATE
+
+    @classmethod
+    def from_dict(cls, dct: JSONLike) -> Self:
+        return cls(
+            name=dct['video_device'],
+            manufacturer=dct['video_device_manufacturer'],
+            description=dct['video_device_description'],
+        )

@@ -19,21 +19,32 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+"""configuration of file paths related to processing of a single session."""
+
 from importlib import reload as _reload  # DEBUG
 
 from . import (
-    configs,
-    spec,
-    io,
+    source,
+    target,
+    session,
 )
 
-_reload(configs)  # DEBUG
-_reload(spec)  # DEBUG
-_reload(io)  # DEBUG
+_reload(source)  # DEBUG
+_reload(target)  # DEBUG
+_reload(session)  # DEBUG
 
-ColumnSpec = spec.ColumnSpec
-TrialSpec = spec.TrialSpec
+SourceVideoFile = source.SourceVideoFile
+SourceVideoFiles = source.SourceVideoFiles
+DLCResultFiles = source.DLCResultFiles
+SourcePaths = source.SourcePaths
 
-load_trials = io.load_trials
-load_downsampled_trials = io.load_downsampled_trials
-write_trials = io.write_trials
+ImagingDataFiles = target.ImagingDataFiles
+DestinationVideoFiles = target.DestinationVideoFiles
+DestinationPaths = target.DestinationPaths
+
+DLCModelConfigs = session.DLCModelConfigs
+PathSettings = session.PathSettings
+
+setup_source_paths = source.setup_source_paths
+setup_destination_paths = target.setup_destination_paths
+setup_path_settings = session.setup_path_settings

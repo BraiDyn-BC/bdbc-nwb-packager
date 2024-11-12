@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Tuple, Dict
+from typing import ClassVar
 from typing_extensions import Self
-from collections import namedtuple as _namedtuple
+from dataclasses import dataclass
 from time import time as _now
 import warnings as _warnings
 
@@ -44,26 +44,33 @@ from pynwb.ophys import (
 )
 from hdmf.common import DynamicTable as _DynamicTable
 
-from .. import (
-    metadata as _metadata,
-)
 from . import (
-    core as _core,
+    stdio as _stdio,
+    file_metadata as _file_metadata,
     imaging as _imaging,
 )
 
 
-class ROISegmentation(_namedtuple('ROISegmentation', (
-    'root',  # ImageSegmentation
-    'B',  # PlaneSegmentation
-    'V',  # PlaneSegmentation
-))):
-    ENTRIES = {
+@dataclass
+class ROISegmentation:
+    root: _ImageSegmentation
+    B: _ImageSegmentation
+    V: _ImageSegmentation
+    ENTRIES: ClassVar[dict[str, str]] = {
         'B': 'dFF_B',
         'V': 'dFF_V',
         'dFF': 'dFF',
     }
-    SEGMENTATION_TYPES = {
+    CHANNELS: ClassVar[dict[str, str]] = {
+        'B': 'dF/F responses (mean over each ROI mask) being calculated from the frames with 473 nm excitation',
+        'V': 'dF/F responses (mean over each ROI mask) being calculated from the frames with 405 nm excitation',
+        'dFF': 'hemodynamics-corrected dF/F calcium responses',
+    }
+    FRAMES: ClassVar[dict[str, str]] = {
+        'B': 'wide-field calcium imaging, with 473 nm excitation',
+        'V': 'wide-field calcium imaging, with 405 nm excitation',
+    }
+    SEGMENTATION_TYPES: ClassVar[dict[str, dict[str, str]]] = {
         'B': dict(
             name='ROIs',
             description="ROIs based on Allen CCF, estimated using the mesoscaler algorithm, in the frames with 473 nm excitation"
@@ -73,30 +80,21 @@ class ROISegmentation(_namedtuple('ROISegmentation', (
             description="ROIs based on Allen CCF, estimated using the mesoscaler algorithm, in the frames with 473 nm excitation"
         ),
     }
-    FRAMES = {
-        'B': 'wide-field calcium imaging, with 473 nm excitation',
-        'V': 'wide-field calcium imaging, with 405 nm excitation',
-    }
-    CHANNELS = {
-        'B': 'dF/F responses (mean over each ROI mask) being calculated from the frames with 473 nm excitation',
-        'V': 'dF/F responses (mean over each ROI mask) being calculated from the frames with 405 nm excitation',
-        'dFF': 'hemodynamics-corrected dF/F calcium responses',
-    }
 
     @property
     def dFF(self) -> _PlaneSegmentation:
         return self.B
 
     @property
-    def frames(self) -> Dict[str, _PlaneSegmentation]:
+    def frames(self) -> dict[str, _PlaneSegmentation]:
         return dict((chan, getattr(self, chan)) for chan in self.FRAMES.keys())
 
     @property
-    def channels(self) -> Dict[str, _PlaneSegmentation]:
+    def channels(self) -> dict[str, _PlaneSegmentation]:
         return dict((chan, getattr(self, chan)) for chan in self.CHANNELS.keys())
 
     @property
-    def planes(self) -> Dict[str, _PlaneSegmentation]:
+    def planes(self) -> dict[str, _PlaneSegmentation]:
         return self.frames
 
     def frame_description(self, frame: str) -> str:
@@ -108,29 +106,34 @@ class ROISegmentation(_namedtuple('ROISegmentation', (
     def channel_entry(self, channel: str) -> str:
         return self.ENTRIES[channel]
 
-    def segmentation_info(self, frame: str) -> Dict[str, str]:
+    def segmentation_info(self, frame: str) -> dict[str, str]:
         return self.SEGMENTATION_TYPES[frame].copy()
 
 
-class SingleROISignal(_namedtuple('ROISignal', (
-    'metadata',
-    'time',
-    'B',
-    'V',
-    'corrected',
-    'slope',
-    'intercept',
-))):
+@dataclass
+class SingleROISignal:
+    metadata: _file_metadata.SingleROIMetadata
+    time: _npt.NDArray[_np.floating]
+    B: _npt.NDArray[_np.floating]
+    V: _npt.NDArray[_np.floating]
+    corrected: _npt.NDArray[_np.floating]
+    slope: float
+    intercept: float
+
     @property
-    def dFF(self) -> _npt.NDArray:
+    def dFF(self) -> _npt.NDArray[_np.floating]:
         return self.corrected
 
 
-class SignalFilter(_namedtuple('Filter', ('b', 'a'))):
+@dataclass
+class SignalFilter:
+    b: _npt.NDArray[_np.floating]
+    a: _npt.NDArray[_np.floating]
+
     @classmethod
     def bandpass(
         cls,
-        bp_range: Tuple[float],
+        bp_range: tuple[float],
         bp_order: int,
         sampling_rate: float,
     ) -> Self:
@@ -148,8 +151,27 @@ class SignalFilter(_namedtuple('Filter', ('b', 'a'))):
         return _filtfilt(self.b, self.a, x)
 
 
+@dataclass
+class CoefficientEstimation:
+    slope: float
+    intercept: float
+    residuals: _npt.NDArray[_np.floating]
+
+    @classmethod
+    def fit(cls, V, B) -> Self:
+        V = V.reshape((-1, 1))
+        B = B.reshape((-1, 1))
+        mod = _LinearRegression(fit_intercept=True).fit(V, B)
+        res = B - mod.predict(V)
+        return cls(
+            slope=float(mod.coef_.ravel()[0]),
+            intercept=float(mod.intercept_.ravel()[0]),
+            residuals=res.ravel(),
+        )
+
+
 def compute_single_roi_signal(
-    roi: _metadata.SingleROIMetadata,
+    roi: _file_metadata.SingleROIMetadata,
     flattened_data: _imaging.ImagingData,
     signal_filter: SignalFilter,
 ) -> SingleROISignal:
@@ -165,13 +187,6 @@ def compute_single_roi_signal(
         interp = (V[1:] + V[:-1]) / 2
         return _np.concatenate([(V[0],), interp])
 
-    def _estimate(V, B) -> Tuple[_LinearRegression, _npt.NDArray]:
-        V = V.reshape((-1, 1))
-        B = B.reshape((-1, 1))
-        mod = _LinearRegression(fit_intercept=True).fit(V, B)
-        res = B - mod.predict(V)
-        return mod, res.ravel()
-
     mask = roi.mask.ravel()
     B = _as_dFF(flattened_data.B[:, mask].mean(1))
     V = _half_frame_forward(
@@ -179,26 +194,26 @@ def compute_single_roi_signal(
     )
     B = signal_filter(B)
     V = signal_filter(V)
-    mod, res = _estimate(V, B)
+    corr = CoefficientEstimation.fit(V, B)
     return SingleROISignal(
         metadata=roi,
         time=flattened_data.time,
         B=B,
         V=V,
-        corrected=res,
-        slope=float(mod.coef_.ravel()[0]),
-        intercept=float(mod.intercept_.ravel()[0])
+        corrected=corr.residuals,
+        slope=corr.slope,
+        intercept=corr.intercept
     )
 
 
 def compute_roi_signals(
-    metadata: _metadata.Metadata,
-    roimeta: _metadata.ROISetMetadata,
+    metadata: _file_metadata.Metadata,
+    roimeta: _file_metadata.ROISetMetadata,
     flattened_data: _imaging.ImagingData,
-    bp_range: Tuple[float] = (0.01, 10),
+    bp_range: tuple[float] = (0.01, 10),
     bp_order: int = 5,
     verbose: bool = True,
-) -> Tuple[SingleROISignal]:
+) -> tuple[SingleROISignal]:
     filt = SignalFilter.bandpass(
         bp_order=bp_order,
         bp_range=bp_range,
@@ -241,7 +256,7 @@ def setup_transformation_entry(transform: _npt.NDArray) -> _DynamicTable:
 
 def setup_roi_segmentation(
     setup: _imaging.NWBImagingSetup,
-    roimeta: _metadata.ROISetMetadata,
+    roimeta: _file_metadata.ROISetMetadata,
 ) -> ROISegmentation:
     segroot = _ImageSegmentation()
     # prepare planes (and the buffer for signals)
@@ -257,11 +272,11 @@ def setup_roi_segmentation(
 
 
 def setup_roisignals_entry(
-    roisigs: Tuple[SingleROISignal],
+    roisigs: tuple[SingleROISignal],
     seg: ROISegmentation,
     verbose: bool = True,
 ) -> _DfOverF:
-    _core.print_message('registering ROIs...', end=' ', verbose=verbose)
+    _stdio.message('registering ROIs...', end=' ', verbose=verbose)
     start = _now()
     timebases = roisigs[0].time
     signals = dict()
@@ -310,14 +325,14 @@ def setup_roisignals_entry(
             dff.add_roi_response_series(sigs)
 
     stop = _now()
-    _core.print_message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+    _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
     return dff
 
 
 def write_roi_entries(
     nwbfile: _nwb.NWBFile,
-    metadata: _metadata.Metadata,
-    roimeta: _metadata.ROISetMetadata,
+    metadata: _file_metadata.Metadata,
+    roimeta: _file_metadata.ROISetMetadata,
     flattened_data: _imaging.ImagingData,
     setup: _imaging.NWBImagingSetup,
     verbose: bool = True,

@@ -20,31 +20,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Generator
+from typing import Iterator
 from time import time as _now
 
 import numpy as _np
 import h5py as _h5
 import pynwb as _nwb
 
-
-from .. import (
-    metadata as _metadata,
-)
+from .types import PathLike
 from . import (
-    core as _core,
+    stdio as _stdio,
+    file_metadata as _file_metadata,
+    timebases as _timebases,
 )
-
-PathLike = _core.PathLike
 
 
 def iterate_raw_daq_recordings(
-    metadata: _metadata.Metadata,
+    metadata: _file_metadata.Metadata,
     rawfile: PathLike,
-    timebases: _core.Timebases,
+    timebases: _timebases.Timebases,
     verbose: bool = True,
-) -> Generator[_nwb.TimeSeries, None, None]:
-    _core.print_message("loading raw DAQ data...", end=' ', verbose=verbose)
+) -> Iterator[_nwb.TimeSeries]:
+    _stdio.message("loading raw DAQ data...", end=' ', verbose=verbose)
     start = _now()
     with _h5.File(rawfile, 'r') as src:
         raw = _np.array(src['behavior_raw/data']).T  # --> shape (T, N)
@@ -59,16 +56,16 @@ def iterate_raw_daq_recordings(
             timestamps=t,
         )
     stop = _now()
-    _core.print_message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+    _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
 
 
 def iterate_downsampled_daq_recordings(
-    metadata: _metadata.Metadata,
+    metadata: _file_metadata.Metadata,
     rawfile: PathLike,
-    timebases: _core.Timebases,
+    timebases: _timebases.Timebases,
     verbose: bool = True,
-) -> Generator[_nwb.TimeSeries, None, None]:
-    _core.print_message("loading down-sampled DAQ data...", end=' ', verbose=verbose)
+) -> Iterator[_nwb.TimeSeries]:
+    _stdio.message("loading down-sampled DAQ data...", end=' ', verbose=verbose)
     start = _now()
     with _h5.File(rawfile, 'r') as src:
         ds = _np.array(src['behavior_ds/data']).T  # --> shape (T, N)
@@ -85,4 +82,4 @@ def iterate_downsampled_daq_recordings(
             timestamps=t,
         )
     stop = _now()
-    _core.print_message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+    _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)

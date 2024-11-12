@@ -19,50 +19,71 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-from typing import Tuple
-from collections import namedtuple as _namedtuple
-import sys as _sys
+from typing import Optional
+from typing_extensions import Self
+from dataclasses import dataclass
 
 import numpy as _np
 import numpy.typing as _npt
 import h5py as _h5
 
-from .. import (
+from .types import (
+    PathLike,
+)
+from . import (
     stdio as _stdio,
-    metadata as _metadata,
-    paths as _paths,
+    configure as _configure,
+    file_metadata as _file_metadata,
 )
 
-PathLike = _paths.PathLike
+Timebase = _npt.NDArray[_np.float32]
+Indices  = _npt.NDArray[_np.integer]
 
 
-class Timebases(_namedtuple('Timebases', (
-    'raw',
-    'videos',
-    'B',
-    'V',
-))):
+@dataclass
+class Timebases:
+    raw: Timebase
+    videos: Timebase
+    B: Timebase
+    V: Timebase
+
     @property
-    def dFF(self) -> _npt.NDArray[_np.float32]:
+    def dFF(self) -> Timebase:
         """the timebase for hemodynamics-corrected signals"""
         return self.B
 
+    def replace(
+        self,
+        raw: Optional[Timebase] = None,
+        videos: Optional[Timebase] = None,
+        B: Optional[Timebase] = None,
+        V: Optional[Timebase] = None,
+    ) -> Self:
+        alt = dict(raw=raw, videos=videos, B=B, V=V)
+        fields = dict()
+        for fld, val in alt.items():
+            if val is None:
+                fields[fld] = getattr(self, fld)
+            else:
+                fields[fld] = val
+        return self.__class__(**fields)
 
-class PulseTriggers(_namedtuple('PulseTriggers', (
-    'videos',
-    'B',
-    'V',
-))):
+
+@dataclass
+class PulseTriggers:
+    videos: Indices
+    B: Indices
+    V: Indices
+
     @property
-    def dFF(self) -> _npt.NDArray[_np.integer]:
+    def dFF(self) -> Indices:
         """the pulse triggers for hemodynamics-corrected signals"""
         return self.B
 
     def as_timebases(
         self,
         ref: _npt.NDArray[_np.floating]
-    ) -> _npt.NDArray[_np.floating]:
+    ) -> Timebase:
         return Timebases(
             raw=ref,
             videos=ref[self.videos] if self.videos is not None else None,
@@ -70,17 +91,27 @@ class PulseTriggers(_namedtuple('PulseTriggers', (
             V=ref[self.V],
         )
 
+    def replace(
+        self,
+        videos: Optional[Indices] = None,
+        B: Optional[Indices] = None,
+        V: Optional[Indices] = None,
+    ) -> Self:
+        alt = dict(videos=videos, B=B, V=V)
+        fields = dict()
+        for fld, val in alt.items():
+            if val is None:
+                fields[fld] = getattr(self, fld)
+            else:
+                fields[fld] = val
+        return self.__class__(**fields)
 
-def print_message(msg: str, end: str = '\n', verbose: bool = True):
-    if verbose:
-        print(msg, end=end, file=_sys.stderr, flush=True)
 
-
-def load_timebases(
-    metadata: _metadata.Metadata,
+def read_timebases(
+    metadata: _file_metadata.Metadata,
     rawfile: PathLike,
     verbose: bool = True,
-) -> Tuple[PulseTriggers, Timebases]:
+) -> tuple[PulseTriggers, Timebases]:
     with _h5.File(rawfile, 'r') as src:
         # NOTE: indexing is in the MATLAB format:
         # need to subtract 1 to convert to the Python format indices
@@ -114,7 +145,7 @@ def validate_timebase_with_imaging(
     triggers: PulseTriggers,
     timebases: Timebases,
     verbose: bool = True,
-) -> Tuple[PulseTriggers, Timebases]:
+) -> tuple[PulseTriggers, Timebases]:
     num_frames = dict()
     with _h5.File(rawfile, 'r') as src:
         num_frames['B'] = src['image/Ib'].shape[0]
@@ -129,7 +160,7 @@ def validate_timebase_with_imaging(
             raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of pulses ({num_pulses})")
         elif num_pulses > num_frames[chan]:
             _stdio.message(f"--> trimming {chan} pulses: {num_pulses} --> {num_frames[chan]}")
-            triggers = triggers._replace(**{chan: pulses[:num_frames[chan]]})
+            triggers = triggers.replace(**{chan: pulses[:num_frames[chan]]})
         else:
             pass
 
@@ -138,7 +169,7 @@ def validate_timebase_with_imaging(
             raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of ticks ({num_ticks})")
         elif num_ticks > num_frames[chan]:
             _stdio.message(f"--> trimming {chan} ticks: {num_ticks} --> {num_frames[chan]}")
-            timebases = timebases._replace(**{chan: timebase[:num_frames[chan]]})
+            timebases = timebases.replace(**{chan: timebase[:num_frames[chan]]})
         else:
             pass
 
@@ -146,14 +177,13 @@ def validate_timebase_with_imaging(
 
 
 def validate_timebase_with_videos(
-    paths: _paths.PathSettings,
+    paths: _configure.PathSettings,
     triggers: PulseTriggers,
     timebases: Timebases,
     tolerance: int = 1,
     verbose: bool = True,
-) -> Tuple[PulseTriggers, Timebases]:
+) -> tuple[PulseTriggers, Timebases]:
     if not paths.has_behavior_videos():
-        triggers = triggers._replace(videos=None)
-        timebases = timebases._replace(videos=None)
+        triggers = triggers.replace(videos=None)
+        timebases = timebases.replace(videos=None)
     return (triggers, timebases)
-

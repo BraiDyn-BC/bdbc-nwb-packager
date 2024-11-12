@@ -19,58 +19,56 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-from collections import namedtuple as _namedtuple
+from typing import Optional
+from dataclasses import dataclass
 from time import time as _now
 import shutil as _shutil
 
 from pynwb import NWBFile as _NWBFile
 from pynwb.image import ImageSeries as _ImageSeries
 
-from .. import (
-    stdio as _stdio,
-    paths as _paths,
-    metadata as _metadata,
-)
 from . import (
-    core as _core,
+    stdio as _stdio,
+    configure as _configure,
+    file_metadata as _file_metadata,
+    timebases as _timebases,
 )
 
 
-DESCRIPTION = {
+VIEWS = {
     'body': 'view of the upper body from the bottom',
     'face': 'view of the face on the right side',
     'eye': 'view of the right eye',
 }
 
 
-class VideoEntries(_namedtuple('VideoEntries', (
-    'body',  # ImageSeries
-    'face',  # ImageSeries
-    'eye',   # ImageSeries
-))):
-    pass
+@dataclass
+class VideoEntries:
+    body: Optional[_ImageSeries]
+    face: Optional[_ImageSeries]
+    eye: Optional[_ImageSeries]
 
 
 def write_videos(
     nwbfile: _NWBFile,
-    metadata: _metadata.Metadata,
-    timebases: _core.Timebases,
-    paths: _paths.PathSettings,
+    metadata: _file_metadata.Metadata,
+    timebases: _timebases.Timebases,
+    paths: _configure.PathSettings,
     copy_files: bool = True,
     verbose: bool = True,
 ) -> VideoEntries:
-
-    relfiles = paths.destination.videos.relative_to(paths.destination.session_dir)
+    relfiles = paths.destination.videos.relative_to(
+        paths.destination.session_dir
+    )
     t = timebases.videos
     device = nwbfile.create_device(
-        name=metadata.videos.device.name,
-        description=metadata.videos.device.description,
-        manufacturer=metadata.videos.device.manufacturer,
+        name=metadata.videos.name,
+        description=metadata.videos.description,
+        manufacturer=metadata.videos.manufacturer,
     )
 
     entries = dict()
-    for view in VideoEntries._fields:
+    for view in VIEWS.keys():
         srcpath = getattr(paths.source.videos, view).path
         dstpath = getattr(paths.destination.videos, view)  # note no need of 'path'
         if srcpath is None:
@@ -86,10 +84,8 @@ def write_videos(
             _shutil.copy(srcpath, dstpath)
             stop = _now()
             _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
-        else:
-            _stdio.message(f"***skip copying {view} video", verbose=verbose)
 
-        desc = DESCRIPTION[view]
+        desc = VIEWS[view]
         entry = _ImageSeries(
             name=f"{view}_video",
             description=f"behavioral video acquisition, {desc}.",
@@ -105,4 +101,3 @@ def write_videos(
 
     _stdio.message("done registering the video files.", verbose=verbose)
     return VideoEntries(**entries)
-

@@ -19,22 +19,23 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+"""the procedure(s) related to batch-processing of multiple sessions.
+Also used as the entry point of the terminal command `package-nwb`"""
 
-from typing import Optional, Generator, Callable, Union, Iterable, Dict, Any
+from typing import Optional, Union, Any
 from pathlib import Path
-from datetime import datetime as _datetime
 from time import time as _now
 
 import bdbc_session_explorer as _sessx
 
+from .types import (
+    PathLike,
+    PathsLike,
+)
 from . import (
     stdio as _stdio,
-    paths as _paths,
     packaging as _packaging,
 )
-
-PathLike = Union[str, Path]
-PathsLike = Union[PathLike, Iterable[PathLike]]
 
 
 def run_batch(
@@ -54,7 +55,9 @@ def run_batch(
     rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
     mesoroot: Optional[PathLike] = None,
-    dlcroot: Optional[PathLike] = None,
+    body_results_root: Optional[PathLike] = None,
+    face_results_root: Optional[PathLike] = None,
+    eye_results_root: Optional[PathLike] = None,
     pupilroot: Optional[PathLike] = None,
     nwbroot: Optional[Path] = None,
     body_model_dir: Optional[PathLike] = None,
@@ -63,7 +66,7 @@ def run_batch(
 ):
     override_metadata = parse_overridden_metadata(override_metadata)
 
-    for sess in filter_sessions(
+    for sess in _sessx.iterate_sessions(
         animal=animal,
         fromdate=fromdate,
         todate=todate,
@@ -76,27 +79,21 @@ def run_batch(
             _stdio.message("***no raw data file", end='\n\n', verbose=verbose)
             continue
         start = _now()
-        paths = _paths.setup_path_settings(
+        _packaging.process(
             session=sess,
+            tasktype=tasktype,
             rawroot=rawroot,
             videoroot=videoroot,
             mesoroot=mesoroot,
-            dlcroot=dlcroot,
+            body_results_root=body_results_root,
+            face_results_root=face_results_root,
+            eye_results_root=eye_results_root,
             pupilroot=pupilroot,
-            nwbroot=nwbroot,
             bodymodeldir=body_model_dir,
             facemodeldir=face_model_dir,
             eyemodeldir=eye_model_dir,
-        )
-        _packaging.package_nwb(
-            paths=paths,
-            tasktype=tasktype,
-            copy_videos=copy_videos,
-            register_rois=register_rois,
-            write_imaging_frames=write_imaging_frames,
-            add_downsampled=add_downsampled,
+            nwbroot=nwbroot,
             override_metadata=override_metadata,
-            overwrite=overwrite,
             verbose=verbose,
         )
         stop = _now()
@@ -107,7 +104,7 @@ def run_batch(
         )
 
 
-def parse_overridden_metadata(spec: Optional[str]) -> Optional[Dict[str, Any]]:
+def parse_overridden_metadata(spec: Optional[str]) -> Optional[dict[str, Any]]:
 
     def _as_int(v) -> Optional[int]:
         try:
@@ -144,108 +141,3 @@ def parse_overridden_metadata(spec: Optional[str]) -> Optional[Dict[str, Any]]:
         fld, rawval = tuple(item.strip() for item in rawspec.split('='))
         specs.append((fld, _normalize(rawval)))
     return dict(specs)
-
-
-def filter_sessions(
-    animal: Optional[str] = None,
-    fromdate: Optional[str] = None,
-    todate: Optional[str] = None,
-    type: Optional[str] = None,
-    sessions_root_dir: Optional[PathLike] = None,
-    verbose: bool = True
-) -> Generator[_sessx.Session, None, None]:
-    is_animal = matcher.animal(animal)
-    is_date = matcher.date(from_date=fromdate, to_date=todate)
-    is_type = matcher.session_type(type)
-
-    def _matches(session: _sessx.Session) -> bool:
-        return is_animal(session.animal) and is_date(session.date) and is_type(session.type)
-
-    sessions_root_dir = _paths.sessions_root_dir(sessions_root_dir)
-    _stdio.message(f"...SESSIONS_ROOT_DIR={repr(str(sessions_root_dir))}", verbose=verbose)
-    if not sessions_root_dir.exists():
-        _stdio.message(f"***session directory not found: {str(sessions_root_dir)}", verbose=True)
-    found = 0
-    for sess in _sessx.iterate_sessions(sessions_root_dir):
-        found += 1
-        if _matches(sess):
-            yield sess
-    if found == 0:
-        _stdio.message("***no sessions found (maybe inappropriate session directory setting?)", verbose=True)
-
-
-class matcher:
-    @staticmethod
-    def matches_all(query: str) -> bool:
-        return True
-
-    @staticmethod
-    def animal(ref: Optional[str]) -> Callable[[str], bool]:
-        if ref is None:
-            return matcher.matches_all
-        else:
-            refs = tuple(item.strip() for item in ref.split(','))
-
-            def match(query: str) -> bool:
-                return (query in refs)
-
-            return match
-
-    @staticmethod
-    def from_date(ref: Optional[str]) -> Callable[[_datetime], bool]:
-        if ref is None:
-            return matcher.matches_all
-        else:
-            ref = _datetime.strptime(ref, '%y%m%d')
-
-            def match(query: _datetime) -> bool:
-                return (query >= ref)
-
-            return match
-
-    @staticmethod
-    def to_date(ref: Optional[str]) -> Callable[[_datetime], bool]:
-        if ref is None:
-            return matcher.matches_all
-        else:
-            ref = _datetime.strptime(ref, '%y%m%d')
-
-            def match(query: _datetime) -> bool:
-                return (query <= ref)
-
-            return match
-
-    @staticmethod
-    def date(
-        from_date: Optional[str],
-        to_date: Optional[str]
-    ) -> Callable[[str], bool]:
-        from_date = matcher.from_date(from_date)
-        to_date = matcher.to_date(to_date)
-
-        def match(query: _datetime) -> bool:
-            return from_date(query) and to_date(query)
-
-        return match
-
-    @staticmethod
-    def session_type(
-        ref: Optional[str]
-    ) -> Callable[[str], bool]:
-        if ref is None:
-            return matcher.matches_all
-        else:
-            mapping = dict(ss='sensory-stim', rest='resting-state')
-            refs = tuple(item.strip() for item in ref.split(','))
-            norm = []
-            for ref in refs:
-                if ref in mapping.keys():
-                    ref = mapping[ref]
-                if ref not in ('task', 'resting-state', 'sensory-stim'):
-                    raise ValueError(f"expected one of ('task', 'resting-state', 'sensory-stim'), got '{ref}'")
-                norm.append(ref)
-            refs = tuple(norm)
-
-            def match(query: str) -> bool:
-                return (query in refs)
-            return match

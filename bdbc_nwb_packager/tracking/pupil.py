@@ -34,12 +34,13 @@ from pynwb.behavior import (
 )
 
 from .. import (
-    paths as _paths,
-    validation as _validation,
-    alignment as _alignment,
+    stdio as _stdio,
+    configure as _configure,
+    timebases as _timebases,
 )
 from . import (
-    core as _core,
+    validation as _validation,
+    alignment as _alignment,
 )
 
 Tracking = Union[_EyeTracking, _PupilTracking]
@@ -61,54 +62,26 @@ class PupilFittingData(_namedtuple('PupilFittingData', (
 
 
 def empty_data(
-    timebases: _core.Timebases,
+    timebases: _timebases.Timebases,
 ) -> Optional[PupilFittingData]:
-    # t = timebases.videos
-    # values = _np.empty((t.size,), dtype=_np.float32)
-    # values.fill(_np.nan)
-
-    # center_x = _SpatialSeries(
-    #     name = 'center_x',
-    #     description = f"(data missing) {DESCRIPTION['center_x']}",
-    #     data = values,
-    #     timestamps = t,
-    #     reference_frame = 'top left',
-    #     unit = 'pixels'
-    # )
-    # center_y = _SpatialSeries(
-    #     name = 'center_y',
-    #     description = f"(data missing) {DESCRIPTION['center_y']}",
-    #     data = values,
-    #     timestamps = t,
-    #     reference_frame = 'top left',
-    #     unit = 'pixels'
-    # )
-    # eye = _EyeTracking(name="eye_position", spatial_series=center_x)
-    # eye.add_spatial_series(spatial_series=center_y)
-
-    # pupil_dia = _TimeSeries(
-    #     name="diameter",
-    #     description=f"(data missing) {DESCRIPTION['diameter']}",
-    #     data=data.D.values,
-    #     timestamps=t,
-    #     unit="pixels",
-    # )
-    # pupil = _PupilTracking(time_series=pupil_dia, name="pupil_tracking")
-    # return PupilFittingData(eye=eye, pupil_dia=pupil)
     return None
 
 
 def load_pupil_fitting(
-    paths: _paths.PathSettings,
-    timebases: _core.Timebases,
-    triggers: Optional[_core.PulseTriggers] = None,
+    paths: _configure.PathSettings,
+    timebases: _timebases.Timebases,
+    triggers: Optional[_timebases.PulseTriggers] = None,
     downsample: bool = False,
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
     if not paths.source.pupilfitting.exists():
-        _core.print_message("***pupil fitting results do not exist", verbose=verbose)
+        _stdio.message("***pupil fitting results do not exist", verbose=verbose)
         return empty_data(timebases)
 
+    if downsample:
+        _stdio.message('registering downsampled pupil-fitting data...', end='', verbose=verbose)
+    else:
+        _stdio.message('registering pupil-fitting data...', end='', verbose=verbose)
     t, trigs, data = _validation.prepare_table_results(
         tabpath=paths.source.pupilfitting,
         srcvideo=paths.source.videos.eye,
@@ -162,4 +135,5 @@ def load_pupil_fitting(
         unit="pixels",
     )
     pupil = _PupilTracking(time_series=pupil_dia, name="pupil_tracking")
+    _stdio.message('done.', verbose=verbose)
     return PupilFittingData(eye=eye, pupil_dia=pupil)

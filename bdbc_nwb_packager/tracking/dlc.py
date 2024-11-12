@@ -30,15 +30,13 @@ from ndx_pose import (
 
 from .. import (
     stdio as _stdio,
-    paths as _paths,
+    configure as _configure,
+    timebases as _timebases,
+)
+from . import (
     validation as _validation,
     alignment as _alignment,
 )
-from . import (
-    core as _core,
-)
-
-PathLike = _core.PathLike
 
 NAME_MAPPINGS = {
     'body': 'forelimb',
@@ -48,39 +46,47 @@ NAME_MAPPINGS = {
 
 
 def iterate_pose_estimations(
-    paths: _paths.PathSettings,
-    timebases: _core.Timebases,
-    triggers: Optional[_core.PulseTriggers] = None,
-    mismatch_tolerance: int = 1,
+    paths: _configure.PathSettings,
+    timebases: _timebases.Timebases,
+    triggers: Optional[_timebases.PulseTriggers] = None,
+    mismatch_tolerance: int = 0,
     downsample: bool = False,
+    downsample_pcutoff: float = 0.2,
     verbose: bool = True,
 ) -> _PoseEstimation:
     """load DeepLabCut results from corresponding HDF5 files,
     and returns a generator iterating over PoseEstimation objects."""
-
-    if downsample:
-        _stdio.message('registering downsampled DeepLabCut:', end=' ', verbose=verbose)
-    else:
-        _stdio.message('registering DeepLabCut:', end=' ', verbose=verbose)
 
     destvideos = paths.destination.videos.relative_to(paths.destination.session_dir)
     for view, model in NAME_MAPPINGS.items():
         srcvideo = getattr(paths.source.videos, view)
         if srcvideo.path is None:
             _stdio.message(
-                f"***missing the {view} video...",
-                end=' ',
+                f"***missing the {view} video",
                 verbose=verbose
             )
             continue
         dlcpath = getattr(paths.source.deeplabcut, view)
         if dlcpath is None:
             _stdio.message(
-                f"***missing the {view} model results...",
+                f"***missing the {view} model results",
                 end=' ',
                 verbose=verbose
             )
             continue
+        elif downsample:
+            _stdio.message(
+                f'registering downsampled estimations from the {view} video...',
+                end='',
+                verbose=verbose
+            )
+        else:
+            _stdio.message(
+                f'registering estimations from the {view} video...',
+                end='',
+                verbose=verbose
+            )
+
         t, trigs, dlctab = _validation.prepare_table_results(
             tabpath=dlcpath,
             srcvideo=srcvideo,
@@ -104,7 +110,6 @@ def iterate_pose_estimations(
                     reduce=_np.nanmean,
                 )
 
-        _stdio.message(f"{view} model...", end=' ', verbose=verbose)
         scorer = dlctab.columns[0][0]
         pose_estimation_name = f"{view}_video_keypoints"
         keypoints = tuple(set(col[1] for col in dlctab.columns))
@@ -114,16 +119,11 @@ def iterate_pose_estimations(
         node_names = [f"{kpt}" for kpt in keypoints]
         for kpt, node_name in zip(keypoints, node_names):
             if downsample:
-                # FIXME: this block should be removed
+                # FIXME: this block may be removed
                 # when the DeepLabCut model become more efficient
-                if kpt == 'tonguetip':
-                    threshold = 0.2
-                else:
-                    threshold = 0.88
-
                 data = _validation.validate_keypoint(
                     dlctab, kpt,
-                    threshold=threshold,
+                    threshold=downsample_pcutoff,
                 ).apply(_downsample).stack()
             else:
                 data = _np.stack([
@@ -141,6 +141,8 @@ def iterate_pose_estimations(
                 confidence=_np.array(dlctab[scorer, kpt, 'likelihood'].values),
                 confidence_definition="Softmax output of the deep neural network.",
             ))
+
+        _stdio.message('done.', verbose=verbose)
         yield _PoseEstimation(
             name=pose_estimation_name,
             description=f"Estimated positions of keypoints from the {view} view frames using DeepLabCut.",
