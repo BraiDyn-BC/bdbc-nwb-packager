@@ -195,7 +195,7 @@ def compute_roi_signals(
     metadata: _metadata.Metadata,
     roimeta: _metadata.ROISetMetadata,
     flattened_data: _imaging.ImagingData,
-    bp_range: Tuple[float] = (0.1, 5),
+    bp_range: Tuple[float] = (0.01, 10),
     bp_order: int = 5,
     verbose: bool = True,
 ) -> Tuple[SingleROISignal]:
