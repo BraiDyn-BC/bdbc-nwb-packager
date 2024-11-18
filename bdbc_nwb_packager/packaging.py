@@ -317,6 +317,12 @@ def load_timebases_impl(
         rawfile=env.paths.source.rawdata,
         verbose=env.verbose
     )
+    triggers, timebases = _timebases.validate_timebase_with_imaging(
+        rawfile=env.paths.source.rawdata,
+        triggers=triggers,
+        timebases=timebases,
+        verbose=env.verbose
+    )
     triggers, timebases = _timebases.validate_timebase_with_videos(
         paths=env.paths,
         triggers=triggers,
@@ -438,17 +444,15 @@ def add_tracking_impl(
     env: PackagingEnvironment,
     downsample: bool = False,
 ) -> PackagingEnvironment:
-    if not env.has_videos():
-        _stdio.message('***skip regisration of behavior tracking: no behavior videos to be processed', verbose=env.verbose)
-        return env
-    elif not env.paths.source.deeplabcut.has_any_results():
-        _stdio.message('***skip registration of behavior tracking: any videos have never been analyzed', verbose=env.verbose)
+    if not env.paths.source.deeplabcut.has_any_results():
+        raise RuntimeError("DLC results not found")
+        _stdio.message('***skip registration of behavior tracking: no DeepLabCut output files were found.', verbose=env.verbose)
         return env
 
     if downsample:
         behav = env.downsampled
     else:
-        behav = env.create_processing_module(
+        behav = env.nwbfile.create_processing_module(
             name="behavior", description="Processed behavioral data"
         )
 

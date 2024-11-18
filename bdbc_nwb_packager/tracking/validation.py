@@ -48,7 +48,7 @@ class PointEstimation:
         )
 
     def stack(self, axis: int = 1) -> _npt.NDArray:
-        return _np.stack(self, axis=axis)
+        return _np.stack([self.x, self.y], axis=axis)
 
 
 @dataclass
