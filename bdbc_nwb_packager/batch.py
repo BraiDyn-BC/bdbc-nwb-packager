@@ -40,6 +40,7 @@ from . import (
 
 def run_batch(
     animal: Optional[str] = None,
+    batch: Optional[str] = None,
     fromdate: Optional[str] = None,
     todate: Optional[str] = None,
     type: Optional[str] = None,
@@ -68,6 +69,7 @@ def run_batch(
 
     for sess in _sessx.iterate_sessions(
         animal=animal,
+        batch=batch,
         fromdate=fromdate,
         todate=todate,
         type=type,

@@ -35,6 +35,11 @@ parser.add_argument(
     help='specifies the animal (or animals, in a comma-separated list) to be processed'
 )
 parser.add_argument(
+    '-B', '--batch',
+    default=None,
+    help='specifies the batch of animals to be processed'
+)
+parser.add_argument(
     '-E', '--fromdate',
     default=None,
     help='specifies the _e_arliest session date to be processed, in the YYMMDD format'
@@ -48,6 +53,12 @@ parser.add_argument(
     '-t', '--type',
     default=None,
     help="specifies the type (or types, in a comma-separated list) of the sessions to be processed: must be one of ('task', 'rest', 'ss')"
+)
+parser.add_argument(
+    '--task-type',
+    default='cued-lever-pull',
+    dest='tasktype',
+    help='the type of the task of the sessions to be processed (current default: cued-lever-pull).'
 )
 parser.add_argument(
     '--no-write-videos',
