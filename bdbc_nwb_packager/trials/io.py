@@ -54,9 +54,13 @@ def load_downsampled_trials(
 ) -> _pd.DataFrame:
     with _h5.File(rawfile, 'r') as src:
         # Loading from hdf5 file
-        data        = _np.array(src["behavior_ds/trial_info/data"], dtype=_np.float32).T
-        label       = _np.array(src["behavior_ds/trial_info/label"]).ravel()
-        label       = [lab.decode('utf-8') for lab in label]  # convert to utf-8
+        data  = _np.array(src["behavior_ds/trial_info/data"], dtype=_np.float32).T
+        label = _np.array(src["behavior_ds/trial_info/label"]).ravel()
+        label = [lab.decode('utf-8') for lab in label]  # convert to utf-8
+
+        if data.shape[0] == 0:
+            return None
+
         # convert to dataframe
         trials_ds = _pd.DataFrame(data, columns=label)
         return trials_ds

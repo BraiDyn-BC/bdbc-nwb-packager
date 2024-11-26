@@ -395,7 +395,10 @@ def add_trials_impl(
             verbose=env.verbose,
         )
     else:
-        _stdio.message('***no trials to be processed', verbose=True)
+        if downsample:
+            _stdio.message('***no downsampled trials to be processed', verbose=True)
+        else:
+            _stdio.message('***no trials to be processed', verbose=True)
         return env
 
     if downsample:
