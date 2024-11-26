@@ -448,7 +448,8 @@ def add_tracking_impl(
     downsample: bool = False,
 ) -> PackagingEnvironment:
     if not env.paths.source.deeplabcut.has_any_results():
-        raise RuntimeError("DLC results not found")
+        if env.paths.session.has_any_videos():
+            raise RuntimeError("DLC results not found")
         _stdio.message('***skip registration of behavior tracking: no DeepLabCut output files were found.', verbose=env.verbose)
         return env
 
