@@ -74,7 +74,7 @@ def load_pupil_fitting(
     downsample: bool = False,
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
-    if not paths.source.pupilfitting.exists():
+    if (paths.source.pupilfitting is None) or (not paths.source.pupilfitting.exists()):
         _stdio.message("***pupil fitting results do not exist", verbose=verbose)
         return empty_data(timebases)
 
