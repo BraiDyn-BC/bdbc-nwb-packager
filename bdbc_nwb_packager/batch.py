@@ -38,6 +38,57 @@ from . import (
 )
 
 
+def find_missing(
+    animal: Optional[str] = None,
+    batch: Optional[str] = None,
+    fromdate: Optional[str] = None,
+    todate: Optional[str] = None,
+    type: Optional[str] = None,
+    tasktype: str = 'cued-lever-pull',
+    sessroot: Optional[PathLike] = None,
+    rawroot: Optional[PathsLike] = None,
+    videoroot: Optional[PathLike] = None,
+    mesoroot: Optional[PathLike] = None,
+    body_results_root: Optional[PathLike] = None,
+    face_results_root: Optional[PathLike] = None,
+    eye_results_root: Optional[PathLike] = None,
+    pupilroot: Optional[PathLike] = None,
+    nwbroot: Optional[Path] = None,
+    body_model_dir: Optional[PathLike] = None,
+    face_model_dir: Optional[PathLike] = None,
+    eye_model_dir: Optional[PathLike] = None,
+):
+    missing = []
+    for sess in _sessx.iterate_sessions(
+        animal=animal,
+        batch=batch,
+        fromdate=fromdate,
+        todate=todate,
+        type=type,
+        sessions_root_dir=sessroot,
+    ):
+        if not sess.has_rawdata():
+            continue
+        if _packaging.is_missing(
+            session=sess,
+            tasktype=tasktype,
+            rawroot=rawroot,
+            videoroot=videoroot,
+            mesoroot=mesoroot,
+            body_results_root=body_results_root,
+            face_results_root=face_results_root,
+            eye_results_root=eye_results_root,
+            pupilroot=pupilroot,
+            bodymodeldir=body_model_dir,
+            facemodeldir=face_model_dir,
+            eyemodeldir=eye_model_dir,
+            nwbroot=nwbroot,
+        ):
+            missing.append(sess)
+    for sess in missing:
+        _stdio.message(f"{sess.batch}/{sess.animal}/{sess.longdate} ({sess.longtype})")
+
+
 def run_batch(
     animal: Optional[str] = None,
     batch: Optional[str] = None,
@@ -84,6 +135,10 @@ def run_batch(
         _packaging.process(
             session=sess,
             tasktype=tasktype,
+            copy_videos=copy_videos,
+            register_rois=register_rois,
+            write_imaging_frames=write_imaging_frames,
+            add_downsampled=add_downsampled,
             rawroot=rawroot,
             videoroot=videoroot,
             mesoroot=mesoroot,

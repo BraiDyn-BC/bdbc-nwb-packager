@@ -29,8 +29,11 @@ import numpy as _np
 import numpy.typing as _npt
 import pandas as _pd
 
+from .. import stdio as _stdio
+
 VALIDATION_ALPHA = _np.nan  # must be smaller (e.g. 0.5)
 VALIDATION_THRESHOLD = 0.2  # must be higher (e.g. 0.9999)
+MISMATCH_TOLERANCE_DEFAULT = 1  # FIXME: ideally it must be zero
 
 
 @dataclass
@@ -91,12 +94,15 @@ def validate_keypoint(
 
 
 def validate_index_ranges(
+    view: str,
     num_frames: int,
     num_pulses: int,
-    mismatch_tolerance: int = 0
+    mismatch_tolerance: int = MISMATCH_TOLERANCE_DEFAULT,
 ) -> IndexRanges:
     """a temporary solution until sizes of timebases/videos are more nicely handled."""
     delta = num_frames - num_pulses
+    if delta > 0:
+        _stdio.message(f"{view}: frame-pulse difference={delta}")
     if delta == 0:
         pulserange = slice(None, None)
         framerange = slice(None, None)
@@ -112,14 +118,16 @@ def validate_index_ranges(
 
 
 def prepare_table_results(
+    view: str,
     tabpath: Path,
     srcvideo: object,
     t_video: _npt.NDArray[_np.floating],
     triggers: _npt.NDArray[_np.integer],
     entry_path: str = 'df_with_missing',
-    mismatch_tolerance: int = 0,
+    mismatch_tolerance: int = MISMATCH_TOLERANCE_DEFAULT,
 ) -> tuple[_npt.NDArray[_np.floating], _npt.NDArray[_np.integer], _pd.DataFrame]:
     tclip, vclip = validate_index_ranges(
+        view=view,
         num_frames=srcvideo.num_frames,
         num_pulses=t_video.size,
         mismatch_tolerance=mismatch_tolerance,

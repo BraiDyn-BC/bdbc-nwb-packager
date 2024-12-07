@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import Iterable, Optional
 from argparse import ArgumentParser as _ArgumentParser
 
 from . import batch as _batch
@@ -104,9 +105,55 @@ parser.add_argument(
 )
 
 
-def batch_package_nwb(args=None):
+missing = _ArgumentParser(
+    prog='find-missing-nwb',
+    description='find the sessions whose missing their corresponding NWB files',
+    epilog='note that all the default directory settings are assumed to be in the environment variables.'
+)
+missing.add_argument(
+    '-A', '--animal',
+    default=None,
+    help='specifies the animal (or animals, in a comma-separated list) to be processed'
+)
+missing.add_argument(
+    '-B', '--batch',
+    default=None,
+    help='specifies the batch of animals to be processed'
+)
+missing.add_argument(
+    '-E', '--fromdate',
+    default=None,
+    help='specifies the _e_arliest session date to be processed, in the YYMMDD format'
+)
+missing.add_argument(
+    '-L', '--todate',
+    default=None,
+    help='specifies the _l_atest session date to be processed, in the YYMMDD format'
+)
+missing.add_argument(
+    '-t', '--type',
+    default=None,
+    help="specifies the type (or types, in a comma-separated list) of the sessions to be processed: must be one of ('task', 'rest', 'ss')"
+)
+missing.add_argument(
+    '--task-type',
+    default='cued-lever-pull',
+    dest='tasktype',
+    help='the type of the task of the sessions to be processed (current default: cued-lever-pull).'
+)
+
+
+def batch_package_nwb(args: Optional[Iterable[str]] = None):
     if args is None:
         specs = vars(parser.parse_args())
     else:
-        specs = vars(parser.parse_args(args))
+        specs = vars(parser.parse_args(tuple(args)))
     _batch.run_batch(**specs)
+
+
+def find_missing_nwb(args: Optional[Iterable[str]] = None):
+    if args is None:
+        specs = vars(missing.parse_args())
+    else:
+        specs = vars(missing.parse_args(tuple(args)))
+    _batch.find_missing(**specs)

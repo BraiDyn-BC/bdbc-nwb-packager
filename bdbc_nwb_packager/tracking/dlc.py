@@ -50,7 +50,7 @@ def iterate_pose_estimations(
     paths: _configure.PathSettings,
     timebases: _timebases.Timebases,
     triggers: Optional[_timebases.PulseTriggers] = None,
-    mismatch_tolerance: int = 0,
+    mismatch_tolerance: int = _validation.MISMATCH_TOLERANCE_DEFAULT,
     downsample: bool = False,
     downsample_pcutoff: float = 0.2,
     verbose: bool = True,
@@ -96,6 +96,7 @@ def iterate_pose_estimations(
                 )
 
             t, trigs, dlctab = _validation.prepare_table_results(
+                view=view,
                 tabpath=dlcpath,
                 srcvideo=srcvideo,
                 t_video=timebases.videos,

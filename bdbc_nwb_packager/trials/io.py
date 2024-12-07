@@ -41,6 +41,8 @@ def load_trials(
         labels = _np.array(src["behavior_raw/trial_info/label"]).ravel()
         labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
 
+        # validation
+        # there can be sessions without any trials (i.e. resting-state)
         if data.shape[0] == 0:
             return None
 
@@ -55,14 +57,16 @@ def load_downsampled_trials(
     with _h5.File(rawfile, 'r') as src:
         # Loading from hdf5 file
         data  = _np.array(src["behavior_ds/trial_info/data"], dtype=_np.float32).T
-        label = _np.array(src["behavior_ds/trial_info/label"]).ravel()
-        label = [lab.decode('utf-8') for lab in label]  # convert to utf-8
+        labels = _np.array(src["behavior_ds/trial_info/label"]).ravel()
+        labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
 
+        # validation
+        # there can be sessions without any trials (i.e. resting-state)
         if data.shape[0] == 0:
             return None
 
         # convert to dataframe
-        trials_ds = _pd.DataFrame(data, columns=label)
+        trials_ds = _pd.DataFrame(data, columns=labels)
         return trials_ds
 
 

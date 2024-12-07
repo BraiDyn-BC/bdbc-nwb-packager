@@ -234,6 +234,39 @@ class PackagingEnvironment:
         return self
 
 
+def is_missing(
+    session: _sessx.Session,
+    tasktype: str = 'cued-lever-pull',
+    rawroot: Optional[PathsLike] = None,
+    videoroot: Optional[PathLike] = None,
+    mesoroot: Optional[PathLike] = None,
+    nwbroot: Optional[PathLike] = None,
+    body_results_root: Optional[PathLike] = None,
+    face_results_root: Optional[PathLike] = None,
+    eye_results_root: Optional[PathLike] = None,
+    pupilroot: Optional[PathLike] = None,
+    bodymodeldir: Optional[PathLike] = None,
+    facemodeldir: Optional[PathLike] = None,
+    eyemodeldir: Optional[PathLike] = None,
+) -> bool:
+    paths = _configure.setup_path_settings(
+        session=session,
+        rawroot=rawroot,
+        videoroot=videoroot,
+        mesoroot=mesoroot,
+        body_results_root=body_results_root,
+        face_results_root=face_results_root,
+        eye_results_root=eye_results_root,
+        pupilroot=pupilroot,
+        bodymodeldir=bodymodeldir,
+        facemodeldir=facemodeldir,
+        eyemodeldir=eyemodeldir,
+        nwbroot=nwbroot,
+    )
+    outfile = paths.destination.nwb
+    return not outfile.exists()
+
+
 def process(
     session: _sessx.Session,
     tasktype: str = 'cued-lever-pull',

@@ -49,8 +49,11 @@ def iterate_raw_daq_recordings(
 
     t = timebases.raw
     for i, lab in enumerate(metadata.task.raw_labels):
+        lab = lab.replace('_raw', '').strip()  # FIXME; need description
+        if len(lab) == 0:
+            continue
         yield _nwb.TimeSeries(
-            name=lab.replace('_raw', ''),  # FIXME; need description
+            name=lab,
             data=raw[:, i],
             unit="a.u.",  # FIXME: check units
             timestamps=t,
@@ -75,8 +78,11 @@ def iterate_downsampled_daq_recordings(
     t    = timebases.B
     clip = slice(0, t.size)
     for i, lab in enumerate(metadata.task.downsampled_labels):
+        lab = lab.replace('_ds', '').strip()  # FIXME; need description
+        if len(lab) == 0:
+            continue
         yield _nwb.TimeSeries(
-            name=lab.replace('_ds', ''),  # FIXME; need description
+            name=lab,
             data=ds[clip, i],
             unit="a.u.",  # FIXME: check units
             timestamps=t,

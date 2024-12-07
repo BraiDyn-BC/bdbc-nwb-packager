@@ -72,6 +72,7 @@ def load_pupil_fitting(
     timebases: _timebases.Timebases,
     triggers: Optional[_timebases.PulseTriggers] = None,
     downsample: bool = False,
+    mismatch_tolerance: int = _validation.MISMATCH_TOLERANCE_DEFAULT,
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
     if (paths.source.pupilfitting is None) or (not paths.source.pupilfitting.exists()):
@@ -83,10 +84,12 @@ def load_pupil_fitting(
     else:
         _stdio.message('registering pupil-fitting data...', end='', verbose=verbose)
     t, trigs, data = _validation.prepare_table_results(
+        view='pupil',
         tabpath=paths.source.pupilfitting,
         srcvideo=paths.source.videos.eye,
         t_video=timebases.videos,
         triggers=triggers.videos,
+        mismatch_tolerance=mismatch_tolerance,
     )
     if downsample:
         t = timebases.dFF
