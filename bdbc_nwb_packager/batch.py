@@ -151,6 +151,7 @@ def run_batch(
             eyemodeldir=eye_model_dir,
             nwbroot=nwbroot,
             override_metadata=override_metadata,
+            overwrite=overwrite,
             verbose=verbose,
         )
         stop = _now()
