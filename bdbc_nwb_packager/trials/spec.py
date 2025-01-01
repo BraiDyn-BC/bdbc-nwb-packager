@@ -19,13 +19,11 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from typing import Optional, Union, Iterable, Iterator, ClassVar
+from typing import Union, Iterable, Iterator, ClassVar
 from typing_extensions import Self
 from dataclasses import dataclass
 
 import pandas as _pd
-
-from . import configs as _configs
 
 
 FieldType = Union[str, int, float]
@@ -76,6 +74,7 @@ class ColumnSpec:
 
 @dataclass
 class TrialSpec:
+    name: str
     columns: Iterable[ColumnSpec] = ()
     REQUIRED_COLUMNS: ClassVar[Iterable[str]] = ('start_time', 'stop_time')
 
@@ -119,14 +118,20 @@ class TrialSpec:
     @classmethod
     def from_dict(cls, dct: dict[str, Union[str, Iterable[dict[str, str]]]]) -> Self:
         return cls(
+            name=dct['name'],
             columns=tuple(ColumnSpec.from_dict(spec) for spec in dct.get('columns', ())),
         )
 
 
-TASK_TYPES = dict()
-TASK_TYPES['cued-lever-pull'] = TrialSpec.from_dict(_configs.CUED_LEVER_PULL)
-TASK_TYPES['sensory-stim'] = TrialSpec.from_dict(_configs.SENSORY_STIM)
+@dataclass
+class Trials:
+    table: _pd.DataFrame
+    flags: dict[str, object]
+    metadata: TrialSpec
 
+    @property
+    def shape(self) -> tuple[int]:
+        return self.table.shape
 
-def get_spec(tasktype: str) -> Optional[TrialSpec]:
-    return TASK_TYPES.get(tasktype, None)
+    def iter_trials_as_dict(self) -> Iterator[dict[str, FieldType]]:
+        yield from self.metadata.iter_trials_from(self.table)

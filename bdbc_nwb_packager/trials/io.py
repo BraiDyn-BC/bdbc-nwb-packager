@@ -20,89 +20,90 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 from typing import Optional, Union
+import json as _json
 
 import numpy as _np
 import pandas as _pd
 import h5py as _h5
 import pynwb as _nwb
 
+import bdbc_session_explorer as _sessx
 from ..types import PathLike
 from . import (
     spec as _spec,
 )
 
 
+def parse_trial_description(entry: _h5.Dataset):
+    items = [item.decode('utf-8') for item in _np.array(entry).ravel()]
+    return _json.loads(items[0])
+
+
+def trials_from_group(
+    group: _h5.Group,
+    trialspec: _sessx.TrialSpec
+) -> Optional[_spec.Trials]:
+    data   = _np.array(group["data"], dtype=_np.float32).T
+    labels = _np.array(group["label"]).ravel()
+    labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
+    flags  = parse_trial_description(group['description'])
+
+    # validation
+    # there can be sessions without any trials (i.e. resting-state)
+    if data.shape[0] == 0:
+        return None
+
+    # convert to dataframe
+    table = _pd.DataFrame(data, columns=labels)
+    trialspec = _spec.TrialSpec.from_dict(trialspec)
+    return _spec.Trials(table=table, flags=flags, metadata=trialspec)
+
+
 def load_trials(
     rawfile: PathLike,
-) -> Optional[_pd.DataFrame]:
+    trialspec: _sessx.TrialSpec
+) -> Optional[_spec.Trials]:
     with _h5.File(rawfile, 'r') as src:
         # Loading from hdf5 file
-        data   = _np.array(src["behavior_raw/trial_info/data"], dtype=_np.float32).T
-        labels = _np.array(src["behavior_raw/trial_info/label"]).ravel()
-        labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
-
-        # validation
-        # there can be sessions without any trials (i.e. resting-state)
-        if data.shape[0] == 0:
-            return None
-
-        # convert to dataframe
-        trials_raw = _pd.DataFrame(data, columns=labels)
-        return trials_raw
+        return trials_from_group(src['behavior_raw/trial_info'], trialspec=trialspec)
 
 
 def load_downsampled_trials(
     rawfile: PathLike,
+    trialspec: _sessx.TrialSpec
 ) -> _pd.DataFrame:
     with _h5.File(rawfile, 'r') as src:
         # Loading from hdf5 file
-        data  = _np.array(src["behavior_ds/trial_info/data"], dtype=_np.float32).T
-        labels = _np.array(src["behavior_ds/trial_info/label"]).ravel()
-        labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
-
-        # validation
-        # there can be sessions without any trials (i.e. resting-state)
-        if data.shape[0] == 0:
-            return None
-
-        # convert to dataframe
-        trials_ds = _pd.DataFrame(data, columns=labels)
-        return trials_ds
+        return trials_from_group(src['behavior_ds/trial_info'], trialspec=trialspec)
 
 
 def write_trials(
     parent: Union[_nwb.NWBFile, _nwb.base.ProcessingModule],
-    trials: _pd.DataFrame,
-    tasktype: str = 'cued_lever_pull',
+    trials: _spec.Trials,
     verbose: bool = True,
 ):
-    trial_spec = _spec.get_spec(tasktype)
-    if trial_spec is None:
-        raise ValueError(f"unknown task type: {tasktype}")
+    is_root = isinstance(parent, _nwb.NWBFile)
+    desc = f"trials of the '{trials.metadata.name}' session"
+    if is_root:
+        desc = "downsampled " + desc
+    trials_table = _nwb.epoch.TimeIntervals(
+        name='trials',
+        description=desc
+    )
 
-    if isinstance(parent, _nwb.NWBFile):
-        table = None
-        _add_column = parent.add_trial_column
-        _add_row = parent.add_trial
-
+    if is_root:
         def _finalize(tab):
-            pass
-
+            parent.trials = tab
     else:
-        taskname = tasktype.replace('_', '-')
-        table = _nwb.epoch.TimeIntervals(
-            name='trials',
-            description=f"downsampled trials of the {taskname} task"
-        )
-        _add_column = table.add_column
-        _add_row = table.add_row
-
         def _finalize(tab):
             parent.add(tab)
 
-    for column in trial_spec.task_specific_columns:
-        _add_column(name=column.name, description=column.description)
+    for column in trials.metadata.required_columns:
+        # a dirty hack to override descriptions
+        trials_table[column.name].fields['description'] = column.description
+    for column in trials.metadata.task_specific_columns:
+        trials_table.add_column(name=column.name, description=column.description)
 
-    for trial in trial_spec.iter_trials_from(trials):
-        _add_row(**trial)
-    _finalize(table)
+    for trial in trials.iter_trials_as_dict():
+        trials_table.add_row(**trial)
+    _finalize(trials_table)

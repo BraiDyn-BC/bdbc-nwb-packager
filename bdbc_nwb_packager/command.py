@@ -56,12 +56,6 @@ parser.add_argument(
     help="specifies the type (or types, in a comma-separated list) of the sessions to be processed: must be one of ('task', 'rest', 'ss')"
 )
 parser.add_argument(
-    '--task-type',
-    default='cued-lever-pull',
-    dest='tasktype',
-    help='the type of the task of the sessions to be processed (current default: cued-lever-pull).'
-)
-parser.add_argument(
     '--no-write-videos',
     action='store_false',
     dest='copy_videos',

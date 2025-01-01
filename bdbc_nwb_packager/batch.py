@@ -102,7 +102,6 @@ def run_batch(
     override_metadata: Optional[str] = None,
     overwrite: bool = False,
     verbose: bool = True,
-    tasktype: str = 'cued-lever-pull',
     sessroot: Optional[PathLike] = None,
     rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
@@ -134,7 +133,6 @@ def run_batch(
         start = _now()
         _packaging.process(
             session=sess,
-            tasktype=tasktype,
             copy_videos=copy_videos,
             register_rois=register_rois,
             write_imaging_frames=write_imaging_frames,

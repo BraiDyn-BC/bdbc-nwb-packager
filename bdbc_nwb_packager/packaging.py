@@ -60,7 +60,7 @@ class PackagingEnvironment:
     verbose: bool = True
     paths: Optional[_configure.PathSettings] = None
     metadata: Optional[_file_metadata.Metadata] = None
-    tasktype: Optional[str] = None
+    trialspec: Optional[_sessx.TrialSpec] = None
     timebases: Optional[_timebases.Timebases] = None
     triggers: Optional[_timebases.PulseTriggers] = None
     has_trials_flag: bool = False
@@ -269,7 +269,6 @@ def is_missing(
 
 def process(
     session: _sessx.Session,
-    tasktype: str = 'cued-lever-pull',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
@@ -317,7 +316,7 @@ def process(
     env = PackagingEnvironment(
         paths=paths,
         metadata=metadata,
-        tasktype=tasktype,
+        trialspec=session.trialspec,
         verbose=verbose,
     )
     env = env.configure_nwbfile()
@@ -412,11 +411,13 @@ def add_trials_impl(
     if downsample:
         trials = _trials.load_downsampled_trials(
             env.paths.source.rawdata,
+            trialspec=env.trialspec,
         )
         parent = env.downsampled
     else:
         trials = _trials.load_trials(
             env.paths.source.rawdata,
+            trialspec=env.trialspec,
         )
         parent = env.nwbfile
 
@@ -424,7 +425,6 @@ def add_trials_impl(
         _trials.write_trials(
             parent,
             trials,
-            tasktype=env.tasktype,
             verbose=env.verbose,
         )
     else:
@@ -436,12 +436,12 @@ def add_trials_impl(
 
     if downsample:
         _stdio.message(
-            f"done registering {trials.shape[0]} downsampled trials",
+            f"done registering {trials.table.shape[0]} downsampled trials",
             verbose=env.verbose
         )
     else:
         _stdio.message(
-            f"done registering {trials.shape[0]} trials",
+            f"done registering {trials.table.shape[0]} trials",
             verbose=env.verbose
         )
     env.has_trials_flag = True

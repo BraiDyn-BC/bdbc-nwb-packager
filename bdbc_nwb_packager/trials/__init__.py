@@ -22,17 +22,16 @@
 from importlib import reload as _reload  # DEBUG
 
 from . import (
-    configs,
     spec,
     io,
 )
 
-_reload(configs)  # DEBUG
 _reload(spec)  # DEBUG
 _reload(io)  # DEBUG
 
 ColumnSpec = spec.ColumnSpec
 TrialSpec = spec.TrialSpec
+Trials = spec.Trials
 
 load_trials = io.load_trials
 load_downsampled_trials = io.load_downsampled_trials
