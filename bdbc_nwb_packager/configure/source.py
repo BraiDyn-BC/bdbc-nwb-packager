@@ -35,7 +35,7 @@ from ..types import (
     maybe_path as _maybe_path,
 )
 from .. import (
-    stdio as _stdio,
+    logging as _logging,
 )
 
 
@@ -204,7 +204,7 @@ def setup_source_paths(
         pupfile  = _sessx.locate_pupil_file(session, pupilroot=pupilroot)
         if (pupfile is None) or (not pupfile.exists()):
             # TODO: probably run fit_pupil?
-            _stdio.message(f"***pupil file not found: {str(pupfile)}", verbose=True)
+            _logging.warning(f"pupil file not found: {str(pupfile)}")
     else:
         pupfile = None
     return SourcePaths(

@@ -28,7 +28,7 @@ from pynwb import NWBFile as _NWBFile
 from pynwb.image import ImageSeries as _ImageSeries
 
 from . import (
-    stdio as _stdio,
+    logging as _logging,
     configure as _configure,
     file_metadata as _file_metadata,
     timebases as _timebases,
@@ -72,18 +72,18 @@ def write_videos(
         srcpath = getattr(paths.source.videos, view).path
         dstpath = getattr(paths.destination.videos, view)  # note no need of 'path'
         if srcpath is None:
-            _stdio.message(f"***skipping {view} video: video file does not exist", verbose=verbose)
+            _logging.warning(f"skipping {view} video: video file does not exist")
             entries[view] = None
             continue
         if not dstpath.parent.exists():
             dstpath.parent.mkdir(parents=True)
 
         if copy_files:
-            _stdio.message(f"copying {view} video...", end=' ', verbose=verbose)
+            _logging.info(f"copying {view} video...")
             start = _now()
             _shutil.copy(srcpath, dstpath)
             stop = _now()
-            _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+            _logging.info(f"done copying video (took {(stop - start):.1f} sec).")
 
         desc = VIEWS[view]
         entry = _ImageSeries(
@@ -96,8 +96,9 @@ def write_videos(
             timestamps=t,
             device=device,
         )
+        _logging.debug(f"registering the {view} video to the NWB file")
         nwbfile.add_acquisition(entry)
         entries[view] = entry
 
-    _stdio.message("done registering the video files.", verbose=verbose)
+    _logging.info(f"done registering {len(entries)}/{len(VIEWS)} video files.")
     return VideoEntries(**entries)

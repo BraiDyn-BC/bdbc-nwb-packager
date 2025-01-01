@@ -29,9 +29,7 @@ import h5py as _h5
 
 import bdbc_session_explorer as _sessx
 
-from ..stdio import (
-    message as _message,
-)
+from .. import logging as _logging
 from .common import (
     JSONLike,
     PathLike,
@@ -113,7 +111,7 @@ def read_roi_metadata(
                     description=f"{group[name].attrs['description']}, {side} hemisphere",
                 )
                 rois.append(roi)
-        _message(f"read {len(rois)} ROIs from the mesoscaler registration file.", verbose=verbose)
+        _logging.info(f"read {len(rois)} ROIs from the mesoscaler registration file.")
         return _ROISetMetadata(
             transform=trans,
             rois=tuple(rois),

@@ -45,7 +45,7 @@ from pynwb.ophys import (
 from hdmf.common import DynamicTable as _DynamicTable
 
 from . import (
-    stdio as _stdio,
+    logging as _logging,
     file_metadata as _file_metadata,
     imaging as _imaging,
 )
@@ -220,11 +220,18 @@ def compute_roi_signals(
         sampling_rate=metadata.imaging.planes[1].frame_rate
     )
     rng = roimeta.rois
+    _logging.debug(f"start pre-processing {len(rng)} ROIs")
+    start = _now()
     if verbose:
         rng = _tqdm(rng, desc='processing rois')
-    return tuple(compute_single_roi_signal(
-        roi, flattened_data, filt
-    ) for roi in rng)
+    processed = []
+    for roi in rng:
+        _logging.debug(f"processing: {roi.name}")
+        proc = compute_single_roi_signal(roi, flattened_data, filt)
+        processed.append(proc)
+    stop = _now()
+    _logging.debug(f"done ROI pre-processing (took {(stop - start):.1f} sec)")
+    return tuple(processed)
 
 
 def setup_transformation_entry(transform: _npt.NDArray) -> _DynamicTable:
@@ -276,7 +283,7 @@ def setup_roisignals_entry(
     seg: ROISegmentation,
     verbose: bool = True,
 ) -> _DfOverF:
-    _stdio.message('registering ROIs...', end=' ', verbose=verbose)
+    _logging.info('registering ROIs...')
     start = _now()
     timebases = roisigs[0].time
     signals = dict()
@@ -293,6 +300,7 @@ def setup_roisignals_entry(
 
         # register rois (and collect signals)
         for roi in roisigs:
+            _logging.debug(f"registering: {roi.metadata.name}")
             for typ, pln in seg.frames.items():
                 pln.add_roi(
                     roi_name=roi.metadata.name,
@@ -305,6 +313,7 @@ def setup_roisignals_entry(
         # register FOVs (i.e. B and V channel frames)
         FOVs = dict()
         for frame, pln in seg.frames.items():
+            _logging.debug(f"registering FOV for: {frame} channel")
             FOVs[frame] = pln.create_roi_table_region(
                 region=[idx for idx in range(len(roisigs))],
                 description=seg.frame_description(frame),
@@ -314,6 +323,7 @@ def setup_roisignals_entry(
         # register signals
         dff = _DfOverF()
         for typ, FOV in FOVs.items():
+            _logging.debug(f"registering ROI signals for type: {typ}")
             sigs = _RoiResponseSeries(
                 name=seg.channel_entry(typ),
                 description=seg.channel_description(typ),
@@ -325,7 +335,7 @@ def setup_roisignals_entry(
             dff.add_roi_response_series(sigs)
 
     stop = _now()
-    _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+    _logging.info(f"done registration of ROI signals (took {(stop - start):.1f} sec).")
     return dff
 
 

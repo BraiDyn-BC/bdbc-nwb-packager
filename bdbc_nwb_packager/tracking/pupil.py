@@ -22,6 +22,7 @@
 
 from typing import Tuple, Generator, Union, Optional
 from collections import namedtuple as _namedtuple
+from time import time as _now
 
 import numpy as _np
 from pynwb import (
@@ -34,7 +35,7 @@ from pynwb.behavior import (
 )
 
 from .. import (
-    stdio as _stdio,
+    logging as _logging,
     configure as _configure,
     timebases as _timebases,
 )
@@ -76,13 +77,14 @@ def load_pupil_fitting(
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
     if (paths.source.pupilfitting is None) or (not paths.source.pupilfitting.exists()):
-        _stdio.message("***pupil fitting results do not exist", verbose=verbose)
+        _logging.warning("pupil fitting results do not exist")
         return empty_data(timebases)
 
     if downsample:
-        _stdio.message('registering downsampled pupil-fitting data...', end='', verbose=verbose)
+        _logging.info('preparing downsampled pupil-fitting data...')
     else:
-        _stdio.message('registering pupil-fitting data...', end='', verbose=verbose)
+        _logging.info('preparing pupil-fitting data...')
+    start = _now()
     t, trigs, data = _validation.prepare_table_results(
         view='pupil',
         tabpath=paths.source.pupilfitting,
@@ -138,5 +140,6 @@ def load_pupil_fitting(
         unit="pixels",
     )
     pupil = _PupilTracking(time_series=pupil_dia, name="pupil_tracking")
-    _stdio.message('done.', verbose=verbose)
+    stop = _now()
+    _logging.info(f'done preparation (took {(stop - start):.1f} s).')
     return PupilFittingData(eye=eye, pupil_dia=pupil)

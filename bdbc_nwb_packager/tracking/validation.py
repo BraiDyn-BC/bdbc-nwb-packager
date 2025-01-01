@@ -29,7 +29,7 @@ import numpy as _np
 import numpy.typing as _npt
 import pandas as _pd
 
-from .. import stdio as _stdio
+from .. import logging as _logging
 
 VALIDATION_ALPHA = _np.nan  # must be smaller (e.g. 0.5)
 VALIDATION_THRESHOLD = 0.2  # must be higher (e.g. 0.9999)
@@ -102,7 +102,7 @@ def validate_index_ranges(
     """a temporary solution until sizes of timebases/videos are more nicely handled."""
     delta = num_frames - num_pulses
     if delta > 0:
-        _stdio.message(f"{view}: frame-pulse difference={delta}")
+        _logging.debug(f"{view}: frame-pulse difference={delta}")
     if delta == 0:
         pulserange = slice(None, None)
         framerange = slice(None, None)

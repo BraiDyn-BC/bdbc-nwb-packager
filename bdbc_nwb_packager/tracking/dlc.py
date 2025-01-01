@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 from typing import Optional
+from time import time as _now
 import warnings as _warnings
 
 import numpy as _np
@@ -30,7 +31,7 @@ from ndx_pose import (
 )
 
 from .. import (
-    stdio as _stdio,
+    logging as _logging,
     configure as _configure,
     timebases as _timebases,
 )
@@ -69,31 +70,25 @@ def iterate_pose_estimations(
         for view, model in NAME_MAPPINGS.items():
             srcvideo = getattr(paths.source.videos, view)
             if srcvideo.path is None:
-                _stdio.message(
-                    f"***missing the {view} video",
-                    verbose=verbose
+                _logging.warning(
+                    f"missing the {view} video",
                 )
                 continue
             dlcpath = getattr(paths.source.deeplabcut, view)
             if dlcpath is None:
-                _stdio.message(
-                    f"***missing the {view} model results",
-                    end=' ',
-                    verbose=verbose
+                _logging.warning(
+                    f"missing the {view} model results",
                 )
                 continue
             elif downsample:
-                _stdio.message(
-                    f'registering downsampled estimations from the {view} video...',
-                    end='',
-                    verbose=verbose
+                _logging.info(
+                    f'preparing downsampled estimations from the {view} video...',
                 )
             else:
-                _stdio.message(
-                    f'registering estimations from the {view} video...',
-                    end='',
-                    verbose=verbose
+                _logging.info(
+                    f'preparing estimations from the {view} video...',
                 )
+            start = _now()
 
             t, trigs, dlctab = _validation.prepare_table_results(
                 view=view,
@@ -151,7 +146,8 @@ def iterate_pose_estimations(
                     confidence_definition="Softmax output of the deep neural network.",
                 ))
 
-            _stdio.message('done.', verbose=verbose)
+            stop = _now()
+            _logging.info(f'done preparation (took {(stop - start):.1f} s).')
             yield _PoseEstimation(
                 name=pose_estimation_name,
                 description=f"Estimated positions of keypoints from the {view} view frames using DeepLabCut.",

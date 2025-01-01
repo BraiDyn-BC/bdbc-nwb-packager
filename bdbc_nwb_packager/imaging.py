@@ -34,7 +34,7 @@ from tqdm import tqdm as _tqdm
 
 from .types import PathLike
 from . import (
-    stdio as _stdio,
+    logging as _logging,
     configure as _configure,
     file_metadata as _file_metadata,
     timebases as _timebases,
@@ -54,15 +54,14 @@ class ImagingData:
     def flatten(self, verbose: bool = True) -> Self:
         if self.B.ndim == 2:
             return self
-        _stdio.message("flattening", end=' ', verbose=verbose)
         data = dict(time=self.time)
         start = _now()
         for fld in self.CHANNELS:
-            _stdio.message(f"{fld} frames...", end=' ', verbose=verbose)
+            _logging.info(f"flattening {fld} frames...")
             frames = getattr(self, fld)
             data[fld] = frames.reshape((frames.shape[0], -1))
         stop = _now()
-        _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
+        _logging.info(f"done flattening frames (took {(stop - start) / 60:.1f} min).")
         return self.__class__(**data)
 
 
@@ -83,12 +82,12 @@ def load_imaging_data(
     if read_frames:
         with _h5.File(rawfile, 'r') as src:
             start = _now()
-            _stdio.message("reading B frames...", end=' ', verbose=verbose)
+            _logging.info("reading B frames...")
             im_B = _np.array(src["image/Ib"], dtype=_np.float32).transpose((0, 2, 1))  # (T, H, W)
-            _stdio.message("V frames...", end=' ', verbose=verbose)
+            _logging.info("reading V frames...")
             im_V = _np.array(src["image/Iv"], dtype=_np.float32).transpose((0, 2, 1))
             stop = _now()
-            _stdio.message(f"done (took {(stop - start) / 60:.1f} min).", verbose=verbose)
+            _logging.info(f"done reading imaging data (took {(stop - start) / 60:.1f} min).")
     else:
         im_B = None,
         im_V = None,
@@ -142,7 +141,7 @@ def setup_imaging_device(
         origin_coords=[0.0, 0.0],
         origin_coords_unit="meters",
     )
-    _stdio.message("done configuring the imaging setup.", verbose=verbose)
+    _logging.info("done configuring the imaging setup.")
     return NWBImagingSetup(
         device=device,
         acquisition=acq,
@@ -162,6 +161,8 @@ def write_imaging_data(
     outfiles = destination.imaging
     if write_frames:
         for chan in frames.CHANNELS:
+            _logging.debug(f"writing {chan} frames...")
+            start = _now()
             outfile = Path(getattr(outfiles, chan))
             if not outfile.parent.exists():
                 outfile.parent.mkdir(parents=True)
@@ -172,11 +173,13 @@ def write_imaging_data(
                     rng = _tqdm(rng, desc=f"writing {chan} frames")
                 for i in rng:
                     out.write(data[i], contiguous=True)
+            stop = _now()
+            _logging.debug(f"done writing {chan} frames (took {(stop - start):.1f} sec)")
     else:
-        _stdio.message('***skip writing imaging frames', verbose=verbose)
+        _logging.info('skip writing imaging frames')
 
     relfiles = outfiles.relative_to(destination.session_dir)
-    _stdio.message("adding channels to registry...", end=' ', verbose=verbose)
+    _logging.debug("adding channels to registry...")
     start = _now()
     sig_B = _nwb.ophys.OnePhotonSeries(
         name='widefield_blue',
@@ -201,4 +204,4 @@ def write_imaging_data(
     nwbfile.add_acquisition(sig_B)
     nwbfile.add_acquisition(sig_V)
     stop = _now()
-    _stdio.message(f"done (took {(stop - start):.1f} sec).", verbose=verbose)
+    _logging.debug(f"done registering channels to the NWB file (took {(stop - start):.1f} sec).")

@@ -31,7 +31,7 @@ from .types import (
     PathLike,
 )
 from . import (
-    stdio as _stdio,
+    logging as _logging,
     configure as _configure,
     file_metadata as _file_metadata,
 )
@@ -122,7 +122,7 @@ def read_timebases(
             videoPulse = _np.array(src["sync_pulse/vid_acquisition_start"], dtype=_np.uint32).ravel() - 1
             videoTime  = _np.array(src["tick_in_second/vid"], dtype=_np.float32).ravel()
         else:
-            _stdio.message('***found no video pulses', verbose=True)
+            _logging.warning("found no video pulses")
             videoPulse = None
             videoTime  = None
 
@@ -159,7 +159,7 @@ def validate_timebase_with_imaging(
         if num_pulses < num_frames[chan]:
             raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of pulses ({num_pulses})")
         elif num_pulses > num_frames[chan]:
-            _stdio.message(f"--> trimming {chan} pulses: {num_pulses} --> {num_frames[chan]}")
+            _logging.debug(f"trimming {chan} pulses: {num_pulses} --> {num_frames[chan]}")
             triggers = triggers.replace(**{chan: pulses[:num_frames[chan]]})
         else:
             pass
@@ -168,7 +168,7 @@ def validate_timebase_with_imaging(
         if num_ticks < num_frames[chan]:
             raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of ticks ({num_ticks})")
         elif num_ticks > num_frames[chan]:
-            _stdio.message(f"--> trimming {chan} ticks: {num_ticks} --> {num_frames[chan]}")
+            _logging.debug(f"trimming {chan} ticks: {num_ticks} --> {num_frames[chan]}")
             timebases = timebases.replace(**{chan: timebase[:num_frames[chan]]})
         else:
             pass

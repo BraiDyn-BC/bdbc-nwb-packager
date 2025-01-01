@@ -40,7 +40,7 @@ from .types import (
     PathsLike,
 )
 from . import (
-    stdio as _stdio,
+    logging as _logging,
     configure as _configure,
     file_metadata as _file_metadata,
     timebases as _timebases,
@@ -110,6 +110,7 @@ class PackagingEnvironment:
             timebases=self.timebases,
             verbose=self.verbose,
         ):
+            _logging.debug(f"add: {ts.name}")
             self.nwbfile.add_acquisition(ts)
         return self
 
@@ -122,6 +123,7 @@ class PackagingEnvironment:
             timebases=self.timebases,
             verbose=self.verbose
         ):
+            _logging.debug(f"add: {ts.name}")
             self.downsampled.add(ts)
         return self
 
@@ -148,14 +150,12 @@ class PackagingEnvironment:
                     verbose=self.verbose
                 )
             else:
-                _stdio.message(
-                    '***skip copying behavior videos (no videos were found)',
-                    verbose=self.verbose
+                _logging.info(
+                    'skip copying behavior videos (no videos were found)',
                 )
         else:
-            _stdio.message(
-                '***skip copying behavior videos (so configured)',
-                verbose=self.verbose
+            _logging.info(
+                'skip copying behavior videos (so configured)',
             )
             _videos.write_videos(
                 nwbfile=self.nwbfile,
@@ -197,9 +197,8 @@ class PackagingEnvironment:
                 verbose=self.verbose,
             )
         else:
-            _stdio.message(
-                '***skip registering ROI data',
-                verbose=self.verbose
+            _logging.info(
+                'skip registering ROI data',
             )
         return self
 
@@ -227,9 +226,8 @@ class PackagingEnvironment:
                 manager=_nwb.get_manager(),
             ) as out:
                 out.write(self.nwbfile)
-        _stdio.message(
+        _logging.info(
             f"saved NWB file to: '{outfile}'",
-            verbose=self.verbose
         )
         return self
 
@@ -305,7 +303,7 @@ def process(
     )
     outfile = paths.destination.nwb
     if outfile.exists() and (not overwrite):
-        _stdio.message(f"***file already exists: '{outfile}'", verbose=verbose)
+        _logging.warning(f"file already exists: '{outfile}'")
         return
     metadata = _file_metadata.read_recordings_metadata(
         paths.session,
@@ -393,7 +391,7 @@ def configure_nwbfile_impl(
         date_of_birth=_datetime.combine(metadata.subject.date_of_birth, _datetime.min.time()).astimezone(None),
         strain=metadata.subject.strain,
     )
-    _stdio.message("configured an NWB file.", verbose=verbose)
+    _logging.info("configured an NWB file")
     return nwbfile
 
 
@@ -429,20 +427,18 @@ def add_trials_impl(
         )
     else:
         if downsample:
-            _stdio.message('***no downsampled trials to be processed', verbose=True)
+            _logging.warning('no downsampled trials to be processed')
         else:
-            _stdio.message('***no trials to be processed', verbose=True)
+            _logging.warning('no trials to be processed')
         return env
 
     if downsample:
-        _stdio.message(
+        _logging.info(
             f"done registering {trials.table.shape[0]} downsampled trials",
-            verbose=env.verbose
         )
     else:
-        _stdio.message(
+        _logging.info(
             f"done registering {trials.table.shape[0]} trials",
-            verbose=env.verbose
         )
     env.has_trials_flag = True
     return env
@@ -483,7 +479,7 @@ def add_tracking_impl(
     if not env.paths.source.deeplabcut.has_any_results():
         if env.paths.session.has_any_videos():
             raise RuntimeError("DLC results not found")
-        _stdio.message('***skip registration of behavior tracking: no DeepLabCut output files were found.', verbose=env.verbose)
+        _logging.warning('skip registration of behavior tracking: no DeepLabCut output files were found.')
         return env
 
     if downsample:
@@ -500,6 +496,7 @@ def add_tracking_impl(
         downsample=downsample,
         verbose=env.verbose,
     ):
+        _logging.debug(f"adding: {pose.name}")
         behav.add(pose)
 
     pupil = _tracking.load_pupil_fitting(

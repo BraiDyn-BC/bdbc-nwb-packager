@@ -23,7 +23,7 @@
 from importlib import reload as _reload  # DEBUG
 
 from . import (
-    stdio,
+    logging,
     types,
     configure,
     file_metadata,
@@ -38,7 +38,7 @@ from . import (
     batch,
 )
 
-_reload(stdio)  # DEBUG
+_reload(logging)  # DEBUG
 _reload(types)  # DEBUG
 _reload(configure)  # DEBUG
 _reload(file_metadata)  # DEBUG
