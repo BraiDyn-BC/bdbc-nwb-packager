@@ -29,8 +29,12 @@ import pynwb as _nwb
 
 import bdbc_session_explorer as _sessx
 from ..types import PathLike
+from .. import (
+    logging as _logging,
+)
 from . import (
     spec as _spec,
+    mapping as _mapping,
 )
 
 
@@ -47,6 +51,9 @@ def trials_from_group(
     labels = _np.array(group["label"]).ravel()
     labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
     flags  = parse_trial_description(group['description'])
+    _logging.debug(f"trial table shape: {data.shape}")
+    _logging.debug(f"trial columns: {labels}")
+    _logging.debug(f"trial flag description: {flags}")
 
     # validation
     # there can be sessions without any trials (i.e. resting-state)
@@ -98,10 +105,17 @@ def write_trials(
         def _finalize(tab):
             parent.add(tab)
 
+    # map: flags --> categories (+ update description)
+    trials = _mapping.map_flags_to_categories(trials)
+
     for column in trials.metadata.required_columns:
         # a dirty hack to override descriptions
+        _logging.debug(f"writing column: {column.name}")
+        _logging.debug(f"column description: {column.description}")
         trials_table[column.name].fields['description'] = column.description
     for column in trials.metadata.task_specific_columns:
+        _logging.debug(f"writing column: {column.name}")
+        _logging.debug(f"column description: {column.description}")
         trials_table.add_column(name=column.name, description=column.description)
 
     for trial in trials.iter_trials_as_dict():

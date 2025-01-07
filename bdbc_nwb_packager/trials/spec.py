@@ -51,6 +51,14 @@ class ColumnSpec:
     def name(self):
         return self.output_name
 
+    def copy(self) -> Self:
+        return self.__class__(
+            self.input_name,
+            self.output_name,
+            self.data_type,
+            self.description
+        )
+
     def get_value_from(self, row: dict[str, FieldType]) -> FieldType:
         return self.data_type(row[self.input_name])
 
@@ -85,6 +93,9 @@ class TrialSpec:
         ):
             raise ValueError('at least two columns (`start_time` and `stop_time`) are needed')
 
+    def deepcopy(self) -> Self:
+        return self.__class__(name=self.name, columns=tuple(col.copy() for col in self.columns))
+
     @property
     def column_names(self) -> Iterable[str]:
         return tuple(col.name for col in self.columns)
@@ -101,6 +112,9 @@ class TrialSpec:
             if column.name in self.REQUIRED_COLUMNS:
                 continue
             yield column
+
+    def column_index(self, name) -> int:
+        return self.column_names.index(name)
 
     def iter_trials_from(
         self,
