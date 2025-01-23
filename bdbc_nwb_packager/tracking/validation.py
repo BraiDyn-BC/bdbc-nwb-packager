@@ -33,7 +33,7 @@ from .. import logging as _logging
 
 VALIDATION_ALPHA = _np.nan  # must be smaller (e.g. 0.5)
 VALIDATION_THRESHOLD = 0.2  # must be higher (e.g. 0.9999)
-MISMATCH_TOLERANCE_DEFAULT = 1  # FIXME: ideally it must be zero
+MISMATCH_TOLERANCE_DEFAULT = 0  # FIXME: ideally it must be zero
 
 
 @dataclass
