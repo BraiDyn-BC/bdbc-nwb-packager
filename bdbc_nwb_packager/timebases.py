@@ -140,6 +140,25 @@ def read_timebases(
         return trigs, timebase
 
 
+def validate_timebase_with_rawdata(
+    rawfile: PathLike,
+    triggers: PulseTriggers,
+    timebases: Timebases,
+    verbose: bool = True,
+) -> tuple[PulseTriggers, Timebases]:
+    with _h5.File(rawfile, 'r') as src:
+        num_columns, num_samples = src['behavior_raw/data'].shape
+    num_timepoints = timebases.raw.size
+    if num_timepoints < num_samples:
+        raise ValueError(f"the number of timepoints ({num_timepoints}) is smaller than the number of samples ({num_samples})")
+    elif num_timepoints > num_samples:
+        _logging.debug(f"trimming raw ticks: {num_timepoints} --> {num_samples}")
+        timebases = timebases.replace(raw=timebases.raw[:num_samples])
+    else:
+        pass
+    return (triggers, timebases)
+
+
 def validate_timebase_with_imaging(
     rawfile: PathLike,
     triggers: PulseTriggers,
@@ -157,7 +176,7 @@ def validate_timebase_with_imaging(
 
         num_pulses = pulses.size
         if num_pulses < num_frames[chan]:
-            raise ValueError(f"the number of frames ({num_frames[chan]}) is larger  than the number of pulses ({num_pulses})")
+            raise ValueError(f"the number of frames ({num_frames[chan]}) is larger than the number of pulses ({num_pulses})")
         elif num_pulses > num_frames[chan]:
             _logging.debug(f"trimming {chan} pulses: {num_pulses} --> {num_frames[chan]}")
             triggers = triggers.replace(**{chan: pulses[:num_frames[chan]]})

@@ -347,6 +347,12 @@ def load_timebases_impl(
         rawfile=env.paths.source.rawdata,
         verbose=env.verbose
     )
+    triggers, timebases = _timebases.validate_timebase_with_rawdata(
+        rawfile=env.paths.source.rawdata,
+        triggers=triggers,
+        timebases=timebases,
+        verbose=env.verbose
+    )
     triggers, timebases = _timebases.validate_timebase_with_imaging(
         rawfile=env.paths.source.rawdata,
         triggers=triggers,
