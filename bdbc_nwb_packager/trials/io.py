@@ -20,7 +20,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 from typing import Optional, Union
-import json as _json
 
 import numpy as _np
 import pandas as _pd
@@ -34,13 +33,7 @@ from .. import (
 )
 from . import (
     spec as _spec,
-    mapping as _mapping,
 )
-
-
-def parse_trial_description(entry: _h5.Dataset):
-    items = [item.decode('utf-8') for item in _np.array(entry).ravel()]
-    return _json.loads(items[0])
 
 
 def trials_from_group(
@@ -50,10 +43,8 @@ def trials_from_group(
     data   = _np.array(group["data"], dtype=_np.float32).T
     labels = _np.array(group["label"]).ravel()
     labels = [lab.decode('utf-8') for lab in labels]  # convert to utf-8
-    flags  = parse_trial_description(group['description'])
     _logging.debug(f"trial table shape: {data.shape}")
     _logging.debug(f"trial columns: {labels}")
-    _logging.debug(f"trial flag description: {flags}")
 
     # validation
     # there can be sessions without any trials (i.e. resting-state)
@@ -63,7 +54,7 @@ def trials_from_group(
     # convert to dataframe
     table = _pd.DataFrame(data, columns=labels)
     trialspec = _spec.TrialSpec.from_dict(trialspec)
-    return _spec.Trials(table=table, flags=flags, metadata=trialspec)
+    return _spec.Trials(table=table, metadata=trialspec)
 
 
 def load_trials(
@@ -91,7 +82,7 @@ def write_trials(
 ):
     is_root = isinstance(parent, _nwb.NWBFile)
     desc = f"trials of the '{trials.metadata.name}' session"
-    if is_root:
+    if not is_root:
         desc = "downsampled " + desc
     trials_table = _nwb.epoch.TimeIntervals(
         name='trials',
@@ -105,18 +96,17 @@ def write_trials(
         def _finalize(tab):
             parent.add(tab)
 
-    # map: flags --> categories (+ update description)
-    trials = _mapping.map_flags_to_categories(trials)
-
     for column in trials.metadata.required_columns:
         # a dirty hack to override descriptions
         _logging.debug(f"writing column: {column.name}")
-        _logging.debug(f"column description: {column.description}")
-        trials_table[column.name].fields['description'] = column.description
+        desc = column.format_description()
+        _logging.debug(f"column description: {desc}")
+        trials_table[column.name].fields['description'] = desc
     for column in trials.metadata.task_specific_columns:
         _logging.debug(f"writing column: {column.name}")
-        _logging.debug(f"column description: {column.description}")
-        trials_table.add_column(name=column.name, description=column.description)
+        desc = column.format_description()
+        _logging.debug(f"column description: {desc}")
+        trials_table.add_column(name=column.name, description=desc)
 
     for trial in trials.iter_trials_as_dict():
         trials_table.add_row(**trial)

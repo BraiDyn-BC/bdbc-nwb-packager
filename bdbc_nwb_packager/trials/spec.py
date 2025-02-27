@@ -19,14 +19,14 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from typing import Union, Iterable, Iterator, ClassVar
+from typing import Union, Iterable, Iterator, ClassVar, Optional
 from typing_extensions import Self
 from dataclasses import dataclass
 
 import pandas as _pd
 
 
-FieldType = Union[str, int, float]
+FieldType = Union[str, int, float, bool]
 
 
 def parse_data_type(typespec: str) -> type:
@@ -36,8 +36,60 @@ def parse_data_type(typespec: str) -> type:
         return int
     elif typespec == 'float':
         return float
+    elif typespec == 'bool':
+        return bool
     else:
         raise ValueError(f"expected one of ('str', 'int', 'float'), got {repr(typespec)}")
+
+
+@dataclass
+class ValueSpec:
+    values: tuple[int]
+    name_lookup: dict[int, str]
+    desc_lookup: dict[int, str]
+
+    def value_to_name(self, value: int) -> str:
+        value = int(value)
+        if value not in self.values:
+            raise ValueError(f"unexpected value ({value})")
+        return self.name_lookup[value]
+
+    def value_to_desc(self, value: int) -> str:
+        value = int(value)
+        if value not in self.values:
+            raise ValueError(f"unexpected value ({value})")
+        return self.desc_lookup[value]
+
+    def item_description(self, value: int) -> str:
+        return f"`{self.name_lookup[value]} ({value})`, {self.desc_lookup[value]}"
+
+    def format_description(self, header: str) -> str:
+        items = "; ".join(self.item_description(value) for value in self.values)
+        return f"{header}: {items}"
+
+    @classmethod
+    def from_dict(cls, cfg: Optional[Iterable[dict[str, object]]] = None) -> Optional[Self]:
+        if cfg is None:
+            return None
+        values = []
+        names = dict()
+        descs = dict()
+        for item in cfg:
+            value = int(item['value'])
+            values.append(value)
+            names[value] = str(item['name'])
+            descs[value] = str(item['description'])
+        return cls(values=tuple(values), name_lookup=names, desc_lookup=descs)
+
+    def to_dict(self) -> Iterable[dict[str, object]]:
+        ret = []
+        for value in self.values:
+            ret.append({
+                'name': self.name_lookup[value],
+                'value': value,
+                'description': self.desc_lookup[value],
+            })
+        return tuple(ret)
 
 
 @dataclass
@@ -45,6 +97,7 @@ class ColumnSpec:
     input_name: str
     output_name: str
     data_type: type = float
+    values: Optional[ValueSpec] = None
     description: str = ''
 
     @property
@@ -52,21 +105,35 @@ class ColumnSpec:
         return self.output_name
 
     def copy(self) -> Self:
+        values = self.values
+        if values is not None:
+            values = values.to_dict()
         return self.__class__(
-            self.input_name,
-            self.output_name,
-            self.data_type,
-            self.description
+            input_name=self.input_name,
+            output_name=self.output_name,
+            data_type=self.data_type,
+            values=values,
+            description=self.description
         )
 
     def get_value_from(self, row: dict[str, FieldType]) -> FieldType:
-        return self.data_type(row[self.input_name])
+        value = self.data_type(row[self.input_name])
+        if self.values is not None:
+            value = self.values.value_to_name(value)
+        return value
+
+    def format_description(self) -> str:
+        if self.values is None:
+            return self.description
+        else:
+            return self.values.format_description(self.description)
 
     def to_dict(self) -> dict[str, str]:
         return {
             'input_name': self.input_name,
             'output_name': self.output_name,
             'data_type': self.data_type.__name__,
+            'values': self.values,
             'description': self.description,
         }
 
@@ -76,6 +143,7 @@ class ColumnSpec:
             input_name=str(dct['name']),
             output_name=str(dct.get('output_name', dct['name'])),
             data_type=parse_data_type(str(dct.get('data_type', 'float'))),
+            values=ValueSpec.from_dict(dct.get('values', None)),
             description=str(dct.get('description', ''))
         )
 
@@ -140,7 +208,6 @@ class TrialSpec:
 @dataclass
 class Trials:
     table: _pd.DataFrame
-    flags: dict[str, object]
     metadata: TrialSpec
 
     @property
