@@ -103,15 +103,16 @@ class PackagingEnvironment:
         )
         return self
 
-    def add_raw_recordings(self) -> Self:
-        for ts in _daq.iterate_raw_daq_recordings(
-            metadata=self.metadata,
-            rawfile=self.paths.source.rawdata,
-            timebases=self.timebases,
-            verbose=self.verbose,
-        ):
-            _logging.debug(f"add: {ts.name}")
-            self.nwbfile.add_acquisition(ts)
+    def add_raw_recordings(self, add_to_nwb: bool = True) -> Self:
+        if add_to_nwb:
+            for ts in _daq.iterate_raw_daq_recordings(
+                metadata=self.metadata,
+                rawfile=self.paths.source.rawdata,
+                timebases=self.timebases,
+                verbose=self.verbose,
+            ):
+                _logging.debug(f"add: {ts.name}")
+                self.nwbfile.add_acquisition(ts)
         return self
 
     def add_downsampled_recordings(
@@ -127,8 +128,8 @@ class PackagingEnvironment:
             self.downsampled.add(ts)
         return self
 
-    def add_trials(self) -> Self:
-        return add_trials_impl(self, downsample=False)
+    def add_trials(self, add_to_nwb: bool = True) -> Self:
+        return add_trials_impl(self, add_to_nwb=add_to_nwb, downsample=False)
 
     def add_downsampled_trials(
         self,
@@ -202,9 +203,10 @@ class PackagingEnvironment:
             )
         return self
 
-    def add_tracking(self) -> Self:
+    def add_tracking(self, add_to_nwb: bool = True) -> Self:
         return add_tracking_impl(
             self,
+            add_to_nwb=add_to_nwb,
             downsample=False
         )
 
@@ -271,6 +273,7 @@ def process(
     register_rois: bool = True,
     write_imaging_frames: bool = True,
     add_downsampled: bool = True,
+    only_downsampled: bool = False,
     override_metadata: Optional[dict[str, Any]] = None,
     overwrite: bool = False,
     verbose: bool = True,
@@ -301,6 +304,9 @@ def process(
         eyemodeldir=eyemodeldir,
         nwbroot=nwbroot,
     )
+    if paths is None:
+        _logging.warning("unknown error: paths failed to be configured")
+        return
     outfile = paths.destination.nwb
     if outfile.exists() and (not overwrite):
         _logging.warning(f"file already exists: '{outfile}'")
@@ -319,15 +325,15 @@ def process(
     )
     env = env.configure_nwbfile()
     env = env.load_timebases()
-    env = env.add_raw_recordings()
-    env = env.add_trials()
-    env = env.add_behavior_videos(copy_videos=copy_videos)
+    env = env.add_raw_recordings(add_to_nwb=(not only_downsampled))
+    env = env.add_trials(add_to_nwb=(not only_downsampled))
+    env = env.add_behavior_videos(copy_videos=copy_videos and (not only_downsampled))
     env = env.add_imaging_data(
-        to_be_written=write_imaging_frames,
+        to_be_written=write_imaging_frames and (not only_downsampled),
         used_for_rois=register_rois,
     )
     env = env.add_rois(register_rois=register_rois)
-    env = env.add_tracking()
+    env = env.add_tracking(add_to_nwb=(not only_downsampled))
     if add_downsampled:
         env = env.configure_downsampled_module()
         env = env.add_downsampled_recordings()
@@ -403,12 +409,15 @@ def configure_nwbfile_impl(
 
 def add_trials_impl(
     env: PackagingEnvironment,
+    add_to_nwb: bool = True,
     downsample: bool = False,
 ) -> PackagingEnvironment:
     # FIXME: override the "task type"
     # to correctly identify the columns
     # upon `write_trials`
     # (there may be a better way, though...)
+    if not add_to_nwb:
+        return env
     if env.paths.session.type != 'task':
         env.tasktype = env.paths.session.type
 
@@ -480,6 +489,7 @@ def add_imaging_data_impl(
 
 def add_tracking_impl(
     env: PackagingEnvironment,
+    add_to_nwb: bool = True,
     downsample: bool = False,
 ) -> PackagingEnvironment:
     if not env.paths.source.deeplabcut.has_any_results():
@@ -490,6 +500,9 @@ def add_tracking_impl(
 
     if downsample:
         behav = env.downsampled
+    elif (not add_to_nwb):
+        env.has_behavior_flag = True
+        return env
     else:
         behav = env.nwbfile.create_processing_module(
             name="behavior", description="Processed behavioral data"
