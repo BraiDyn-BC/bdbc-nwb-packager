@@ -69,6 +69,10 @@ class PackagingEnvironment:
     imaging: Optional[_imaging.ImagingData] = None
     has_behavior_flag: bool = False
     downsampled: Optional[object] = None  # TODO
+    compression: Optional[str] = 'gzip'
+    compression_opts: Optional[int] = 6
+    tiff_compression: Optional[str] = 'deflate'
+    tiff_compression_level: Optional[int] = 4
 
     def loaded_trials(self) -> bool:
         return self.has_trials_flag
@@ -109,6 +113,8 @@ class PackagingEnvironment:
                 metadata=self.metadata,
                 rawfile=self.paths.source.rawdata,
                 timebases=self.timebases,
+                compression=self.compression,
+                compression_opts=self.compression_opts,
                 verbose=self.verbose,
             ):
                 _logging.debug(f"add: {ts.name}")
@@ -122,6 +128,8 @@ class PackagingEnvironment:
             metadata=self.metadata,
             rawfile=self.paths.source.rawdata,
             timebases=self.timebases,
+            compression=self.compression,
+            compression_opts=self.compression_opts,
             verbose=self.verbose
         ):
             _logging.debug(f"add: {ts.name}")
@@ -482,6 +490,8 @@ def add_imaging_data_impl(
         frames=env.imaging,
         setup=env.imgsetup,
         write_frames=to_be_written,
+        compression=env.tiff_compression,
+        compression_level=env.tiff_compression_level,
         verbose=env.verbose
     )
     return env
@@ -491,6 +501,8 @@ def add_tracking_impl(
     env: PackagingEnvironment,
     add_to_nwb: bool = True,
     downsample: bool = False,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
 ) -> PackagingEnvironment:
     if not env.paths.source.deeplabcut.has_any_results():
         if env.paths.session.has_any_videos():
@@ -509,20 +521,26 @@ def add_tracking_impl(
         )
 
     for pose in _tracking.iterate_pose_estimations(
+        file=env.nwbfile,
         paths=env.paths,
         timebases=env.timebases,
         triggers=env.triggers,
         downsample=downsample,
+        compression=compression,
+        compression_opts=compression_opts,
         verbose=env.verbose,
     ):
         _logging.debug(f"adding: {pose.name}")
         behav.add(pose)
+        behav.add(pose.skeleton)
 
     pupil = _tracking.load_pupil_fitting(
         paths=env.paths,
         timebases=env.timebases,
         triggers=env.triggers,
         downsample=downsample,
+        compression=compression,
+        compression_opts=compression_opts,
         verbose=env.verbose
     )
     if pupil is not None:

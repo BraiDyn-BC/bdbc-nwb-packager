@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import ClassVar
+from typing import ClassVar, Optional
 from typing_extensions import Self
 from dataclasses import dataclass
 from time import time as _now
@@ -43,6 +43,7 @@ from pynwb.ophys import (
     RoiResponseSeries as _RoiResponseSeries,
 )
 from hdmf.common import DynamicTable as _DynamicTable
+from hdmf.backends.hdf5.h5_utils import H5DataIO as _H5DataIO
 
 from . import (
     logging as _logging,
@@ -281,6 +282,8 @@ def setup_roi_segmentation(
 def setup_roisignals_entry(
     roisigs: tuple[SingleROISignal],
     seg: ROISegmentation,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
     verbose: bool = True,
 ) -> _DfOverF:
     _logging.info('registering ROIs...')
@@ -327,7 +330,11 @@ def setup_roisignals_entry(
             sigs = _RoiResponseSeries(
                 name=seg.channel_entry(typ),
                 description=seg.channel_description(typ),
-                data=_np.stack(signals[typ], axis=1),
+                data=_H5DataIO(
+                    data=_np.stack(signals[typ], axis=1),
+                    compression=compression,
+                    compression_opts=compression_opts,
+                ),
                 unit="a.u.",
                 rois=FOV,
                 timestamps=getattr(timebases, typ),
@@ -345,6 +352,8 @@ def write_roi_entries(
     roimeta: _file_metadata.ROISetMetadata,
     flattened_data: _imaging.ImagingData,
     setup: _imaging.NWBImagingSetup,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
     verbose: bool = True,
 ) -> _nwb.ProcessingModule:
     roisigs = compute_roi_signals(
@@ -354,7 +363,13 @@ def write_roi_entries(
         verbose=verbose,
     )
     seg = setup_roi_segmentation(setup, roimeta)
-    dff = setup_roisignals_entry(roisigs, seg, verbose=verbose)
+    dff = setup_roisignals_entry(
+        roisigs,
+        seg,
+        compression=compression,
+        compression_opts=compression_opts,
+        verbose=verbose
+    )
     mod = nwbfile.create_processing_module(
         name="ophys", description="optical physiology processed data"
     )

@@ -20,12 +20,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Iterator
+from typing import Iterator, Optional
 from time import time as _now
 
 import numpy as _np
 import h5py as _h5
 import pynwb as _nwb
+from hdmf.backends.hdf5.h5_utils import H5DataIO as _H5DataIO
 
 from .types import PathLike
 from . import (
@@ -39,6 +40,8 @@ def iterate_raw_daq_recordings(
     metadata: _file_metadata.Metadata,
     rawfile: PathLike,
     timebases: _timebases.Timebases,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
     verbose: bool = True,
 ) -> Iterator[_nwb.TimeSeries]:
     _logging.info("start retrieving raw DAQ data")
@@ -56,7 +59,11 @@ def iterate_raw_daq_recordings(
         _logging.debug(f"found record: {lab}")
         yield _nwb.TimeSeries(
             name=lab,
-            data=raw[:, i],
+            data=_H5DataIO(
+                data=raw[:, i],
+                compression=compression,
+                compression_opts=compression_opts,
+            ),
             unit="a.u.",  # FIXME: check units
             timestamps=t,
         )
@@ -69,6 +76,8 @@ def iterate_downsampled_daq_recordings(
     metadata: _file_metadata.Metadata,
     rawfile: PathLike,
     timebases: _timebases.Timebases,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
     verbose: bool = True,
 ) -> Iterator[_nwb.TimeSeries]:
     _logging.info("start retrieving down-sampled DAQ data")
@@ -88,7 +97,11 @@ def iterate_downsampled_daq_recordings(
         _logging.debug(f"found record: {lab}")
         yield _nwb.TimeSeries(
             name=lab,
-            data=ds[clip, i],
+            data=_H5DataIO(
+                data=ds[clip, i],
+                compression=compression,
+                compression_opts=compression_opts,
+            ),
             unit="a.u.",  # FIXME: check units
             timestamps=t,
         )

@@ -37,7 +37,7 @@ class DeviceMetadata:
 
 @dataclass
 class BehaviorVideosMetadata(DeviceMetadata):
-    RATE: ClassVar[float] = 120.0
+    RATE: ClassVar[float] = 100.0
 
     @property
     def rate(self) -> float:

@@ -33,6 +33,7 @@ from pynwb.behavior import (
     PupilTracking as _PupilTracking,
     EyeTracking as _EyeTracking,
 )
+from hdmf.backends.hdf5.h5_utils import H5DataIO as _H5DataIO
 
 from .. import (
     logging as _logging,
@@ -74,6 +75,8 @@ def load_pupil_fitting(
     triggers: Optional[_timebases.PulseTriggers] = None,
     downsample: bool = False,
     mismatch_tolerance: int = _validation.MISMATCH_TOLERANCE_DEFAULT,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
     verbose: bool = True,
 ) -> Optional[PupilFittingData]:
     if (paths.source.pupilfitting is None) or (not paths.source.pupilfitting.exists()):
@@ -102,16 +105,24 @@ def load_pupil_fitting(
                 size=timebases.raw.size,
                 pulseidxx=trigs,
             )
-            return _alignment.downsample(
-                u,
-                pulseidxx=triggers.dFF,
-                reduce=_np.nanmean,
+            return _H5DataIO(
+                data=_alignment.downsample(
+                    u,
+                    pulseidxx=triggers.dFF,
+                    reduce=_np.nanmean,
+                ),
+                compression=compression,
+                compression_opts=compression_opts,
             )
 
     else:
 
         def _prepare(x):
-            return x
+            return _H5DataIO(
+                data=x,
+                compression=compression,
+                compression_opts=compression_opts,
+            )
 
     center_x = _SpatialSeries(
         name='center_x',

@@ -25,7 +25,10 @@ from time import time as _now
 import warnings as _warnings
 
 import numpy as _np
+from hdmf.backends.hdf5.h5_utils import H5DataIO as _H5DataIO
+from pynwb import NWBFile as _NWBFile
 from ndx_pose import (
+    Skeleton as _Skeleton,
     PoseEstimationSeries as _PoseEstimationSeries,
     PoseEstimation as _PoseEstimation,
 )
@@ -48,12 +51,15 @@ NAME_MAPPINGS = {
 
 
 def iterate_pose_estimations(
+    file: _NWBFile,
     paths: _configure.PathSettings,
     timebases: _timebases.Timebases,
     triggers: Optional[_timebases.PulseTriggers] = None,
     mismatch_tolerance: int = _validation.MISMATCH_TOLERANCE_DEFAULT,
     downsample: bool = False,
     downsample_pcutoff: float = 0.2,
+    compression: Optional[str] = 'gzip',
+    compression_opts: Optional[int] = 6,
     verbose: bool = True,
 ) -> _PoseEstimation:
     """load DeepLabCut results from corresponding HDF5 files,
@@ -65,7 +71,6 @@ def iterate_pose_estimations(
     # this is a temporary solution until the NWB group takes care of it.
     with _warnings.catch_warnings():
         _warnings.filterwarnings('ignore', category=PendingDeprecationWarning)
-
         destvideos = paths.destination.videos.relative_to(paths.destination.session_dir)
         for view, model in NAME_MAPPINGS.items():
             srcvideo = getattr(paths.source.videos, view)
@@ -88,6 +93,8 @@ def iterate_pose_estimations(
                 _logging.info(
                     f'preparing estimations from the {view} video...',
                 )
+            camera = file.get_device(f"{view}_camera")
+            _logging.debug(f"keypoints for camera: {camera}")
             start = _now()
 
             t, trigs, dlctab = _validation.prepare_table_results(
@@ -116,6 +123,7 @@ def iterate_pose_estimations(
 
             scorer = dlctab.columns[0][0]
             pose_estimation_name = f"{view}_video_keypoints"
+            skeleton_name = f"{view}_video_keypoint_set"
             keypoints = tuple(set(col[1] for col in dlctab.columns))
 
             series = []
@@ -138,7 +146,11 @@ def iterate_pose_estimations(
                 series.append(_PoseEstimationSeries(
                     name=node_name,
                     description=f"Keypoint '{kpt}' from the {view} video.",
-                    data=data,
+                    data=_H5DataIO(
+                        data=data,
+                        compression=compression,
+                        compression_opts=compression_opts,
+                    ),
                     unit='pixels',
                     reference_frame="(0,0) corresponds to the top left corner of the video.",
                     timestamps=t,
@@ -148,13 +160,19 @@ def iterate_pose_estimations(
 
             stop = _now()
             _logging.info(f'done preparation (took {(stop - start):.1f} s).')
+            skeleton = _Skeleton(
+                name=skeleton_name,
+                nodes=node_names,
+                edges=None,
+            )
             yield _PoseEstimation(
                 name=pose_estimation_name,
                 description=f"Estimated positions of keypoints from the {view} view frames using DeepLabCut.",
+                devices=[camera],
+                skeleton=skeleton,
                 pose_estimation_series=series,
-                nodes=node_names,
                 original_videos=[str(getattr(destvideos, view))],
-                labeled_videos=[],
+                labeled_videos=[''],
                 dimensions=_np.array(
                     [[srcvideo.width, srcvideo.height]], dtype=_np.uint16,
                 ),  # pixel dimensions of the video

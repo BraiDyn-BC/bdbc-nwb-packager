@@ -100,7 +100,8 @@ def setup_imaging_device(
     verbose: bool = True,
 ) -> NWBImagingSetup:
     device = nwbfile.create_device(
-        name=metadata.imaging.device.name,
+        name="sCMOS_camera",
+        model_number=metadata.imaging.device.name,
         description=metadata.imaging.device.description,
         manufacturer=metadata.imaging.device.manufacturer,
     )
@@ -156,6 +157,8 @@ def write_imaging_data(
     frames: ImagingData,
     setup: NWBImagingSetup,
     write_frames: bool = True,
+    compression: Optional[str] = 'deflate',
+    compression_level: Optional[int] = 4,
     verbose: bool = True,
 ):
     outfiles = destination.imaging
@@ -170,9 +173,20 @@ def write_imaging_data(
             with _TiffWriter(str(outfile), bigtiff=True) as out:
                 rng = range(data.shape[0])
                 if verbose:
-                    rng = _tqdm(rng, desc=f"writing {chan} frames")
+                    rng = _tqdm(
+                        rng,
+                        desc=f"writing {chan} frames",
+                        mininterval=1.0,
+                        smoothing=0.001,
+                    )
                 for i in rng:
-                    out.write(data[i], contiguous=True)
+                    out.write(
+                        data[i],
+                        photometric='minisblack',
+                        compression=compression,
+                        compressionargs=dict(level=compression_level),
+                        metadata=None,
+                    )
             stop = _now()
             _logging.debug(f"done writing {chan} frames (took {(stop - start):.1f} sec)")
     else:

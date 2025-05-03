@@ -61,14 +61,15 @@ def write_videos(
         paths.destination.session_dir
     )
     t = timebases.videos
-    device = nwbfile.create_device(
-        name=metadata.videos.name,
-        description=metadata.videos.description,
-        manufacturer=metadata.videos.manufacturer,
-    )
 
     entries = dict()
     for view in VIEWS.keys():
+        device = nwbfile.create_device(
+            name=f"{view}_camera",
+            model_number=metadata.videos.name,
+            description=metadata.videos.description,
+            manufacturer=metadata.videos.manufacturer,
+        )
         srcpath = getattr(paths.source.videos, view).path
         dstpath = getattr(paths.destination.videos, view)  # note no need of 'path'
         if srcpath is None:
