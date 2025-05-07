@@ -26,6 +26,7 @@ from typing_extensions import Self
 from dataclasses import dataclass
 from datetime import datetime as _datetime
 from uuid import uuid4 as _uuid4
+from time import time as _now
 import warnings as _warnings
 
 import pynwb as _nwb
@@ -226,6 +227,8 @@ class PackagingEnvironment:
 
     def write_nwb_file(self, mode: str = 'w') -> Self:
         outfile = self.paths.destination.nwb
+        _logging.info("writing out...")
+        start = _now()
         with _warnings.catch_warnings():
             _warnings.simplefilter('ignore', category=_DtypeConversionWarning)
             if not outfile.parent.exists():
@@ -236,6 +239,8 @@ class PackagingEnvironment:
                 manager=_nwb.get_manager(),
             ) as out:
                 out.write(self.nwbfile)
+        stop = _now()
+        _logging.info(f"done writing out (took {(stop - start) / 60:.1f} min)")
         _logging.info(
             f"saved NWB file to: '{outfile}'",
         )
@@ -245,6 +250,7 @@ class PackagingEnvironment:
 def is_missing(
     session: _sessx.Session,
     tasktype: str = 'cued-lever-pull',
+    packaging_format: str = 'default',
     rawroot: Optional[PathsLike] = None,
     videoroot: Optional[PathLike] = None,
     mesoroot: Optional[PathLike] = None,
@@ -259,6 +265,7 @@ def is_missing(
 ) -> bool:
     paths = _configure.setup_path_settings(
         session=session,
+        packaging_format=packaging_format.lower(),
         rawroot=rawroot,
         videoroot=videoroot,
         mesoroot=mesoroot,
@@ -277,9 +284,11 @@ def is_missing(
 
 def process(
     session: _sessx.Session,
+    packaging_format: str = 'default',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
+    save_imaging_in_avi: bool = False,
     add_downsampled: bool = True,
     only_downsampled: bool = False,
     override_metadata: Optional[dict[str, Any]] = None,
@@ -311,6 +320,8 @@ def process(
         facemodeldir=facemodeldir,
         eyemodeldir=eyemodeldir,
         nwbroot=nwbroot,
+        packaging_format=packaging_format.lower(),
+        save_imaging_in_avi=save_imaging_in_avi,
     )
     if paths is None:
         _logging.warning("unknown error: paths failed to be configured")

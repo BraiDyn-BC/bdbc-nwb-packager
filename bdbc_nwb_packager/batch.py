@@ -39,6 +39,7 @@ from . import (
 
 
 def find_missing(
+    packaging_format: str = 'default',
     animal: Optional[str] = None,
     batch: Optional[str] = None,
     fromdate: Optional[str] = None,
@@ -74,6 +75,7 @@ def find_missing(
         if _packaging.is_missing(
             session=sess,
             tasktype=tasktype,
+            packaging_format=packaging_format,
             rawroot=rawroot,
             videoroot=videoroot,
             mesoroot=mesoroot,
@@ -98,9 +100,11 @@ def run_batch(
     fromdate: Optional[str] = None,
     todate: Optional[str] = None,
     type: Optional[str] = None,
+    packaging_format: str = 'default',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
+    save_imaging_in_avi: bool = False,
     add_downsampled: bool = True,
     override_metadata: Optional[str] = None,
     overwrite: bool = False,
@@ -147,9 +151,11 @@ def run_batch(
         try:
             _packaging.process(
                 session=sess,
+                packaging_format=packaging_format,
                 copy_videos=copy_videos,
                 register_rois=register_rois,
                 write_imaging_frames=write_imaging_frames,
+                save_imaging_in_avi=save_imaging_in_avi,
                 add_downsampled=add_downsampled,
                 rawroot=rawroot,
                 videoroot=videoroot,

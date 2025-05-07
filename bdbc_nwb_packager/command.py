@@ -31,6 +31,12 @@ parser = _ArgumentParser(
     epilog='note that all the default directory settings are assumed to be in the environment variables.'
 )
 parser.add_argument(
+    '-O', '--packaging-format',
+    default='default',
+    dest='packaging_format',
+    help="specifies the file structure of the output ('default' or 'dandi')"
+)
+parser.add_argument(
     '-A', '--animal',
     default=None,
     help='specifies the animal (or animals, in a comma-separated list) to be processed'
@@ -80,6 +86,12 @@ parser.add_argument(
     help='suppresses generation and registration of downsampled data',
 )
 parser.add_argument(
+    '--imaging-data-in-avi',
+    action='store_true',
+    dest='save_imaging_in_avi',
+    help='stores imaging data in the uncompressed AVI format',
+)
+parser.add_argument(
     '-m' '--metadata',
     default=None,
     dest='override_metadata',
@@ -103,6 +115,12 @@ missing = _ArgumentParser(
     prog='find-missing-nwb',
     description='find the sessions whose missing their corresponding NWB files',
     epilog='note that all the default directory settings are assumed to be in the environment variables.'
+)
+missing.add_argument(
+    '-O', '--packaging-format',
+    default='default',
+    dest='packaging_format',
+    help="specifies the file structure of the output ('default' or 'dandi')"
 )
 missing.add_argument(
     '-A', '--animal',

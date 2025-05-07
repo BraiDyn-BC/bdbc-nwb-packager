@@ -93,6 +93,8 @@ def setup_path_settings(
     bodymodeldir: Optional[PathLike] = None,
     facemodeldir: Optional[PathLike] = None,
     eyemodeldir: Optional[PathLike] = None,
+    packaging_format: str = 'default',
+    save_imaging_in_avi: bool = False,
 ) -> Optional[PathSettings]:
     if not session.has_rawdata():
         return None
@@ -114,6 +116,8 @@ def setup_path_settings(
     dest    = _setup_destination_paths(
         session,
         nwbroot=nwbroot,
+        packaging_format=packaging_format,
+        save_imaging_in_avi=save_imaging_in_avi,
     )
     return PathSettings(
         session=session,

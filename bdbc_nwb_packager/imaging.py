@@ -30,6 +30,7 @@ import numpy.typing as _npt
 import h5py as _h5
 import pynwb as _nwb
 from tifffile import TiffWriter as _TiffWriter
+from skvideo.io import FFmpegWriter as _FFmpegWriter
 from tqdm import tqdm as _tqdm
 
 from .types import PathLike
@@ -170,23 +171,24 @@ def write_imaging_data(
             if not outfile.parent.exists():
                 outfile.parent.mkdir(parents=True)
             data = getattr(frames, chan)
-            with _TiffWriter(str(outfile), bigtiff=True) as out:
-                rng = range(data.shape[0])
-                if verbose:
-                    rng = _tqdm(
-                        rng,
-                        desc=f"writing {chan} frames",
-                        mininterval=1.0,
-                        smoothing=0.001,
-                    )
-                for i in rng:
-                    out.write(
-                        data[i],
-                        photometric='minisblack',
-                        compression=compression,
-                        compressionargs=dict(level=compression_level),
-                        metadata=None,
-                    )
+            if outfiles.format == 'tiff':
+                write_tiff(
+                    chan=chan,
+                    data=data,
+                    outfile=outfile,
+                    compression=compression,
+                    compression_level=compression_level,
+                    verbose=verbose,
+                )
+            elif outfiles.format == 'avi':
+                write_avi(
+                    chan=chan,
+                    data=data,
+                    outfile=outfile,
+                    verbose=verbose,
+                )
+            else:
+                raise ValueError(f"unexpected format: {outfiles.format}")
             stop = _now()
             _logging.debug(f"done writing {chan} frames (took {(stop - start):.1f} sec)")
     else:
@@ -219,3 +221,62 @@ def write_imaging_data(
     nwbfile.add_acquisition(sig_V)
     stop = _now()
     _logging.debug(f"done registering channels to the NWB file (took {(stop - start):.1f} sec).")
+
+
+def as_uint16(frame):
+    return _np.clip(frame, 0, 65535).round().astype(_np.uint16)
+
+
+def write_tiff(
+    chan: str,
+    data: _npt.NDArray,
+    outfile: Path,
+    compression: str,
+    compression_level: Optional[int],
+    verbose: bool,
+):
+    assert outfile.suffix == '.tiff'
+    with _TiffWriter(str(outfile), bigtiff=True) as out:
+        rng = range(data.shape[0])
+        if verbose:
+            rng = _tqdm(
+                rng,
+                desc=f"writing {chan} frames",
+                mininterval=1.0,
+                smoothing=0.001,
+            )
+        for i in rng:
+            out.write(
+                as_uint16(data[i]),
+                photometric='minisblack',
+                compression=compression,
+                compressionargs=dict(level=compression_level),
+                metadata=None,
+            )
+
+
+def write_avi(
+    chan: str,
+    data: _npt.NDArray,
+    outfile: Path,
+    verbose: bool,
+):
+    odict = {
+        '-vcodec': 'rawvideo',
+        '-pix_fmt': 'gray16le',
+        '-r': '30',
+    }
+    assert outfile.suffix == '.avi'
+    with _FFmpegWriter(str(outfile), outputdict=odict) as out:
+        rng = range(data.shape[0])
+        if verbose:
+            rng = _tqdm(
+                rng,
+                desc=f"writing {chan} frames",
+                mininterval=1.0,
+                smoothing=0.001,
+            )
+        for i in rng:
+            out.writeFrame(
+                as_uint16(data[i]),
+            )

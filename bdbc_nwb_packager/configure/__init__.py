@@ -39,7 +39,7 @@ DLCResultFiles = source.DLCResultFiles
 SourcePaths = source.SourcePaths
 
 ImagingDataFiles = target.ImagingDataFiles
-DestinationVideoFiles = target.DestinationVideoFiles
+BehaviorVideoFiles = target.BehaviorVideoFiles
 DestinationPaths = target.DestinationPaths
 
 DLCModelConfigs = session.DLCModelConfigs
