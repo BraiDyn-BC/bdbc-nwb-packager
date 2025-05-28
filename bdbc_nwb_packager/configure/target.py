@@ -21,12 +21,20 @@
 # SOFTWARE.
 """the 'destination' part of the path configuration (definitely simpler than the 'source' side)"""
 
-from typing import Optional
+from typing import Optional, Literal, ClassVar
 from typing_extensions import Self
 from pathlib import Path
 from dataclasses import dataclass
 
 import bdbc_session_explorer as _sessx
+
+from .. import (
+    logging as _logging,
+)
+
+
+PackagingFormat = Literal['default', 'dandi']
+ImagingDataFormat = Literal['infer', 'internal', 'tiff', 'avi']
 
 
 # TODO: what if the channel configs changed? (maybe the use of dict's would be better?)
@@ -60,13 +68,30 @@ class BehaviorVideoFiles:
 
 
 @dataclass
-class DefaultPackaging:
+class BasePackaging:
     root: Path
     session: _sessx.Session
-    save_imaging_in_avi: bool = False
+    imaging_data_format: ImagingDataFormat = 'infer'
+    DEFAULT_IMG_FORMAT: ClassVar[str] = 'tiff'
 
     def __post_init__(self):
         self.root = _sessx.publication_root_dir(self.root)
+
+    def infer_imaging_data_format(self) -> str:
+        _logging.debug(f"specified imaging data format: {self.imaging_data_format}")
+        if self.imaging_data_format != 'infer':
+            return self.imaging_data_format
+        else:
+            _logging.debug(f"infer: use default imaging data format: {self.DEFAULT_IMG_FORMAT}")
+            return self.DEFAULT_IMG_FORMAT
+
+
+@dataclass
+class DefaultPackaging(BasePackaging):
+    DEFAULT_IMG_FORMAT: ClassVar[str] = 'tiff'
+
+    def __post_init__(self):
+        super().__post_init__()
 
     @property
     def animal(self) -> str:
@@ -94,9 +119,13 @@ class DefaultPackaging:
 
     @property
     def imaging_data_files(self) -> ImagingDataFiles:
+        fmt = self.infer_imaging_data_format()
+        _logging.info(f"imaging data format: {fmt}")
+        if fmt == 'internal':
+            return ImagingDataFiles(fmt, None, None)
+        # otherwise
         imgdir = self.imaging_dir
         sessname = self.session_name
-        fmt = 'avi' if self.save_imaging_in_avi == True else 'tiff'
         return ImagingDataFiles(
             format=fmt,
             B=(imgdir / f"{sessname}_B.{fmt}"),
@@ -115,13 +144,11 @@ class DefaultPackaging:
 
 
 @dataclass
-class DANDIPackaging:
-    root: Path
-    session: _sessx.Session
-    save_imaging_in_avi: bool = False
+class DANDIPackaging(BasePackaging):
+    DEFAULT_IMG_FORMAT: ClassVar[str] = 'internal'
 
     def __post_init__(self):
-        self.root = _sessx.publication_root_dir(self.root)
+        super().__post_init__()
 
     @property
     def subject_name(self) -> str:
@@ -157,9 +184,13 @@ class DANDIPackaging:
 
     @property
     def imaging_data_files(self) -> ImagingDataFiles:
+        fmt = self.infer_imaging_data_format()
+        _logging.debug(f"imaging data format: {fmt}")
+        if fmt == 'internal':
+            return ImagingDataFiles(fmt, None, None)
+        # otherwise
         imgdir = self.resource_dir
         basename = self.session_base
-        fmt = 'avi' if self.save_imaging_in_avi == True else 'tiff'
         return ImagingDataFiles(
             format=fmt,
             B=(imgdir / f"{basename}_widefield-B.{fmt}"),
@@ -191,20 +222,20 @@ class DestinationPaths:
 def setup_destination_paths(
     session: _sessx.Session,
     nwbroot: Optional[Path] = None,
-    packaging_format: str = 'default',
-    save_imaging_in_avi: bool = False,
+    packaging_format: PackagingFormat = 'default',
+    imaging_data_format: ImagingDataFormat = 'infer',
 ) -> DestinationPaths:
     if packaging_format == 'default':
         packaging = DefaultPackaging(
             root=nwbroot,
             session=session,
-            save_imaging_in_avi=save_imaging_in_avi
+            imaging_data_format=imaging_data_format,
         )
     elif packaging_format == 'dandi':
         packaging = DANDIPackaging(
             root=nwbroot,
             session=session,
-            save_imaging_in_avi=save_imaging_in_avi,
+            imaging_data_format=imaging_data_format,
         )
     else:
         raise ValueError(f"expected one of ('default', 'dandi'), got '{packaging_format}'")

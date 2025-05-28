@@ -37,6 +37,8 @@ from .source import (
     setup_source_paths as _setup_source_paths,
 )
 from .target import (
+    PackagingFormat,
+    ImagingDataFormat,
     DestinationPaths,
     setup_destination_paths as _setup_destination_paths,
 )
@@ -93,8 +95,8 @@ def setup_path_settings(
     bodymodeldir: Optional[PathLike] = None,
     facemodeldir: Optional[PathLike] = None,
     eyemodeldir: Optional[PathLike] = None,
-    packaging_format: str = 'default',
-    save_imaging_in_avi: bool = False,
+    packaging_format: PackagingFormat = 'default',
+    imaging_data_format: ImagingDataFormat = 'infer',
 ) -> Optional[PathSettings]:
     if not session.has_rawdata():
         return None
@@ -117,7 +119,7 @@ def setup_path_settings(
         session,
         nwbroot=nwbroot,
         packaging_format=packaging_format,
-        save_imaging_in_avi=save_imaging_in_avi,
+        imaging_data_format=imaging_data_format,
     )
     return PathSettings(
         session=session,

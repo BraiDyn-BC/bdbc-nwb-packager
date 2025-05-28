@@ -32,6 +32,10 @@ from .types import (
     PathLike,
     PathsLike,
 )
+from .configure import (
+    PackagingFormat,
+    ImagingDataFormat,
+)
 from . import (
     logging as _logging,
     packaging as _packaging,
@@ -39,7 +43,7 @@ from . import (
 
 
 def find_missing(
-    packaging_format: str = 'default',
+    packaging_format: PackagingFormat = 'default',
     animal: Optional[str] = None,
     batch: Optional[str] = None,
     fromdate: Optional[str] = None,
@@ -59,7 +63,7 @@ def find_missing(
     face_model_dir: Optional[PathLike] = None,
     eye_model_dir: Optional[PathLike] = None,
 ):
-    logger = _logging.get_logger(file_output=True, prefix='batch_')
+    logger = _logging.get_logger(file_output=True, prefix='missing_')
 
     missing = []
     for sess in _sessx.iterate_sessions(
@@ -100,11 +104,11 @@ def run_batch(
     fromdate: Optional[str] = None,
     todate: Optional[str] = None,
     type: Optional[str] = None,
-    packaging_format: str = 'default',
+    packaging_format: PackagingFormat = 'default',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
-    save_imaging_in_avi: bool = False,
+    imaging_data_format: ImagingDataFormat = 'infer',
     add_downsampled: bool = True,
     override_metadata: Optional[str] = None,
     overwrite: bool = False,
@@ -141,7 +145,7 @@ def run_batch(
         verbose=verbose,
     ):
         sessions_processed.append(sess)
-        logger.info(f"====== {sess.batch}/{sess.animal} {sess.longdate} ({sess.longtype}) ======")
+        logger.info(f"====== {sess.batch}/{sess.animal} {sess.longdate} (day {sess.dayindex}, {sess.longtype}) ======")
         if not sess.has_rawdata():
             logger.warning(f"{sess.batch}/{sess.animal}/{sess.longdate}({sess.longtype}): no raw data file")
             sessions_without_rawdata.append(sess)
@@ -155,7 +159,7 @@ def run_batch(
                 copy_videos=copy_videos,
                 register_rois=register_rois,
                 write_imaging_frames=write_imaging_frames,
-                save_imaging_in_avi=save_imaging_in_avi,
+                imaging_data_format=imaging_data_format,
                 add_downsampled=add_downsampled,
                 rawroot=rawroot,
                 videoroot=videoroot,

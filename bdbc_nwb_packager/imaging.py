@@ -19,7 +19,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-from typing import ClassVar, Optional
+from typing import ClassVar, Optional, Callable
 from typing_extensions import Self
 from pathlib import Path
 from dataclasses import dataclass
@@ -29,6 +29,7 @@ import numpy as _np
 import numpy.typing as _npt
 import h5py as _h5
 import pynwb as _nwb
+from hdmf.backends.hdf5.h5_utils import H5DataIO as _H5DataIO
 from tifffile import TiffWriter as _TiffWriter
 from skvideo.io import FFmpegWriter as _FFmpegWriter
 from tqdm import tqdm as _tqdm
@@ -42,9 +43,13 @@ from . import (
 )
 
 
+def as_uint16(frame):
+    return _np.clip(frame, 0, 65535).round().astype(_np.uint16)
+
+
 @dataclass
 class ImagingData:
-    time: _npt.NDArray[_np.floating]
+    time: _timebases.Timebases
     B: Optional[_npt.NDArray[_np.floating]]
     V: Optional[_npt.NDArray[_np.floating]]
     CHANNELS: ClassVar[tuple[str]] = ('B', 'V')
@@ -158,11 +163,125 @@ def write_imaging_data(
     frames: ImagingData,
     setup: NWBImagingSetup,
     write_frames: bool = True,
-    compression: Optional[str] = 'deflate',
+    compression: Optional[str] = 'gzip',
     compression_level: Optional[int] = 4,
     verbose: bool = True,
 ):
     outfiles = destination.imaging
+    if outfiles.format == 'internal':
+        write_frames_internal(
+            nwbfile=nwbfile,
+            frames=frames,
+            setup=setup,
+            write_frames=write_frames,
+            compression=compression,
+            compression_level=compression_level,
+            verbose=verbose,
+        )
+    elif outfiles.format == 'tiff':
+        write_frames_external(
+            outfiles=outfiles,
+            frames=frames,
+            write_fn=write_tiff,
+            write_frames=write_frames,
+            compression=compression,
+            compression_level=compression_level,
+            verbose=verbose,
+        )
+        register_channels_external(
+            nwbfile=nwbfile,
+            setup=setup,
+            relfiles=outfiles.relative_to(destination.session_dir),
+            timestamps=frames.time,
+        )
+    elif outfiles.format == 'avi':
+        write_frames_external(
+            outfiles=outfiles,
+            frames=frames,
+            write_fn=write_avi,
+            write_frames=write_frames,
+            compression=compression,
+            compression_level=compression_level,
+            verbose=verbose,
+        )
+        register_channels_external(
+            nwbfile=nwbfile,
+            setup=setup,
+            relfiles=outfiles.relative_to(destination.session_dir),
+            timestamps=frames.time,
+        )
+    else:
+        raise ValueError(f"unexpected format: {outfiles.format}")
+
+
+def write_frames_internal(
+    nwbfile: _nwb.NWBFile,
+    frames: ImagingData,
+    setup: NWBImagingSetup,
+    write_frames: bool = True,
+    compression: Optional[str] = 'gzip',
+    compression_level: Optional[int] = 6,
+    frame_chunk: int = 1,
+    verbose: bool = True,
+):
+    if compression is None:
+        _logging.info("override compression algorithm to 'gzip'")
+        compression = 'gzip'
+    if compression_level is None:
+        compression_level = 4
+
+    _logging.info(f"writing channels to the NWB file (compression: '{compression} ({compression_level})')...")
+    start = _now()
+    _, W, H = frames.B.shape
+
+    if write_frames == True:
+        def _format(data):
+            return _H5DataIO(
+                data=as_uint16(data),
+                chunks=(frame_chunk, W, H),
+                compression=compression,
+                compression_opts=compression_level,
+            )
+    else:
+        def _format(data):
+            return _np.zeros((W, H), dtype=_np.uint16)
+        _logging.info("skip writing imaging data")
+
+    _logging.debug("B channel...")
+    sig_B = _nwb.ophys.OnePhotonSeries(
+        name='widefield_blue',
+        description='motion-corrected widefield imaging data, blue excitation',
+        imaging_plane=setup.B,
+        unit="n.a.",
+        data=_format(frames.B),
+        starting_frame=[0],
+        timestamps=frames.time.B,
+    )
+    nwbfile.add_acquisition(sig_B)
+    _logging.debug("V channel...")
+    sig_V = _nwb.ophys.OnePhotonSeries(
+        name='widefield_UV',
+        description='motion-corrected widefield imaging data, UV excitation',
+        imaging_plane=setup.V,
+        unit="n.a.",
+        data=_format(frames.V),
+        starting_frame=[0],
+        timestamps=frames.time.V,
+    )
+    nwbfile.add_acquisition(sig_V)
+    stop = _now()
+    _logging.info(f"done registering channels to the NWB file (took {(stop - start) / 60:.1f} min).")
+
+
+def write_frames_external(
+    outfiles: _configure.ImagingDataFiles,
+    frames: ImagingData,
+    write_fn: Callable,
+    write_frames: bool = True,
+    compression: Optional[str] = 'gzip',
+    compression_level: Optional[int] = 4,
+    verbose: bool = True,
+):
     if write_frames:
         for chan in frames.CHANNELS:
             _logging.debug(f"writing {chan} frames...")
@@ -171,51 +290,47 @@ def write_imaging_data(
             if not outfile.parent.exists():
                 outfile.parent.mkdir(parents=True)
             data = getattr(frames, chan)
-            if outfiles.format == 'tiff':
-                write_tiff(
-                    chan=chan,
-                    data=data,
-                    outfile=outfile,
-                    compression=compression,
-                    compression_level=compression_level,
-                    verbose=verbose,
-                )
-            elif outfiles.format == 'avi':
-                write_avi(
-                    chan=chan,
-                    data=data,
-                    outfile=outfile,
-                    verbose=verbose,
-                )
-            else:
-                raise ValueError(f"unexpected format: {outfiles.format}")
+            write_fn(
+                chan=chan,
+                data=data,
+                outfile=outfile,
+                compression=compression,
+                compression_level=compression_level,
+                verbose=verbose,
+            )
             stop = _now()
             _logging.debug(f"done writing {chan} frames (took {(stop - start):.1f} sec)")
     else:
         _logging.info('skip writing imaging frames')
 
-    relfiles = outfiles.relative_to(destination.session_dir)
+
+def register_channels_external(
+    nwbfile: _nwb.NWBFile,
+    setup: NWBImagingSetup,
+    relfiles: _configure.ImagingDataFiles,
+    timestamps: _timebases.Timebases,
+):
     _logging.debug("adding channels to registry...")
     start = _now()
     sig_B = _nwb.ophys.OnePhotonSeries(
         name='widefield_blue',
-        description='widefield imaging data, blue excitation',
+        description='motion-corrected widefield imaging data, blue excitation',
         imaging_plane=setup.B,
         unit="n.a.",
         external_file=[str(relfiles.B)],
         format="external",
         starting_frame=[0],
-        timestamps=frames.time.B,
+        timestamps=timestamps.B,
     )
     sig_V = _nwb.ophys.OnePhotonSeries(
         name='widefield_UV',
-        description='widefield imaging data, UV excitation',
+        description='motion-corrected widefield imaging data, UV excitation',
         imaging_plane=setup.V,
         unit="n.a.",
         external_file=[str(relfiles.V)],
         format="external",
         starting_frame=[0],
-        timestamps=frames.time.V,
+        timestamps=timestamps.V,
     )
     nwbfile.add_acquisition(sig_B)
     nwbfile.add_acquisition(sig_V)
@@ -223,8 +338,15 @@ def write_imaging_data(
     _logging.debug(f"done registering channels to the NWB file (took {(stop - start):.1f} sec).")
 
 
-def as_uint16(frame):
-    return _np.clip(frame, 0, 65535).round().astype(_np.uint16)
+def write_internal(
+    chan: str,
+    data: _npt.NDArray,
+    outfile: Path,
+    compression: str,
+    compression_level: Optional[int],
+    verbose: bool,
+):
+    raise NotImplementedError()
 
 
 def write_tiff(
@@ -236,6 +358,9 @@ def write_tiff(
     verbose: bool,
 ):
     assert outfile.suffix == '.tiff'
+    if compression == 'gzip':
+        _logging.info("overriding compression algorithm: gzip -> deflate")
+        compression = 'deflate'
     with _TiffWriter(str(outfile), bigtiff=True) as out:
         rng = range(data.shape[0])
         if verbose:
@@ -260,6 +385,7 @@ def write_avi(
     data: _npt.NDArray,
     outfile: Path,
     verbose: bool,
+    **_
 ):
     odict = {
         '-vcodec': 'rawvideo',

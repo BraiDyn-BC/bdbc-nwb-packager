@@ -94,7 +94,7 @@ def iterate_pose_estimations(
                     f'preparing estimations from the {view} video...',
                 )
             camera = file.get_device(f"{view}_camera")
-            _logging.debug(f"keypoints for camera: {camera}")
+            # _logging.debug(f"keypoints for camera: {camera}")
             start = _now()
 
             t, trigs, dlctab = _validation.prepare_table_results(

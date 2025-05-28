@@ -54,6 +54,10 @@ from . import (
 )
 
 
+PackagingFormat = _configure.PackagingFormat
+ImagingDataFormat = _configure.ImagingDataFormat
+
+
 @dataclass
 class PackagingEnvironment:
     """the temporary storage of variables during the
@@ -70,10 +74,10 @@ class PackagingEnvironment:
     imaging: Optional[_imaging.ImagingData] = None
     has_behavior_flag: bool = False
     downsampled: Optional[object] = None  # TODO
+    # although level=4 will do for TIFF output
+    # level=6 appears to be better for the other data
     compression: Optional[str] = 'gzip'
-    compression_opts: Optional[int] = 6
-    tiff_compression: Optional[str] = 'deflate'
-    tiff_compression_level: Optional[int] = 4
+    compression_level: Optional[int] = 6
 
     def loaded_trials(self) -> bool:
         return self.has_trials_flag
@@ -115,7 +119,7 @@ class PackagingEnvironment:
                 rawfile=self.paths.source.rawdata,
                 timebases=self.timebases,
                 compression=self.compression,
-                compression_opts=self.compression_opts,
+                compression_opts=self.compression_level,
                 verbose=self.verbose,
             ):
                 _logging.debug(f"add: {ts.name}")
@@ -130,7 +134,7 @@ class PackagingEnvironment:
             rawfile=self.paths.source.rawdata,
             timebases=self.timebases,
             compression=self.compression,
-            compression_opts=self.compression_opts,
+            compression_opts=self.compression_level,
             verbose=self.verbose
         ):
             _logging.debug(f"add: {ts.name}")
@@ -284,11 +288,11 @@ def is_missing(
 
 def process(
     session: _sessx.Session,
-    packaging_format: str = 'default',
+    packaging_format: PackagingFormat = 'default',
     copy_videos: bool = True,
     register_rois: bool = True,
     write_imaging_frames: bool = True,
-    save_imaging_in_avi: bool = False,
+    imaging_data_format: ImagingDataFormat = 'infer',
     add_downsampled: bool = True,
     only_downsampled: bool = False,
     override_metadata: Optional[dict[str, Any]] = None,
@@ -321,7 +325,7 @@ def process(
         eyemodeldir=eyemodeldir,
         nwbroot=nwbroot,
         packaging_format=packaging_format.lower(),
-        save_imaging_in_avi=save_imaging_in_avi,
+        imaging_data_format=imaging_data_format.lower(),
     )
     if paths is None:
         _logging.warning("unknown error: paths failed to be configured")
@@ -501,8 +505,8 @@ def add_imaging_data_impl(
         frames=env.imaging,
         setup=env.imgsetup,
         write_frames=to_be_written,
-        compression=env.tiff_compression,
-        compression_level=env.tiff_compression_level,
+        compression=env.compression,
+        compression_level=env.compression_level,
         verbose=env.verbose
     )
     return env
@@ -513,7 +517,7 @@ def add_tracking_impl(
     add_to_nwb: bool = True,
     downsample: bool = False,
     compression: Optional[str] = 'gzip',
-    compression_opts: Optional[int] = 6,
+    compression_level: Optional[int] = 6,
 ) -> PackagingEnvironment:
     if not env.paths.source.deeplabcut.has_any_results():
         if env.paths.session.has_any_videos():
@@ -538,7 +542,7 @@ def add_tracking_impl(
         triggers=env.triggers,
         downsample=downsample,
         compression=compression,
-        compression_opts=compression_opts,
+        compression_opts=compression_level,
         verbose=env.verbose,
     ):
         _logging.debug(f"adding: {pose.name}")
@@ -551,7 +555,7 @@ def add_tracking_impl(
         triggers=env.triggers,
         downsample=downsample,
         compression=compression,
-        compression_opts=compression_opts,
+        compression_opts=compression_level,
         verbose=env.verbose
     )
     if pupil is not None:

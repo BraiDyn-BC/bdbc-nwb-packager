@@ -33,6 +33,9 @@ _reload(source)  # DEBUG
 _reload(target)  # DEBUG
 _reload(session)  # DEBUG
 
+PackagingFormat = target.PackagingFormat
+ImagingDataFormat = target.ImagingDataFormat
+
 SourceVideoFile = source.SourceVideoFile
 SourceVideoFiles = source.SourceVideoFiles
 DLCResultFiles = source.DLCResultFiles

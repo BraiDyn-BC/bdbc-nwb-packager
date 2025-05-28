@@ -86,10 +86,11 @@ parser.add_argument(
     help='suppresses generation and registration of downsampled data',
 )
 parser.add_argument(
-    '--imaging-data-in-avi',
-    action='store_true',
-    dest='save_imaging_in_avi',
-    help='stores imaging data in the uncompressed AVI format',
+    '--imaging-data-format',
+    choices=['infer', 'internal', 'tiff', 'avi'],
+    default='infer',
+    dest='imaging_data_format',
+    help="specifies the option of imaging data storage. 'infer' is used by default (i.e. based on the packaging format)."
 )
 parser.add_argument(
     '-m' '--metadata',
