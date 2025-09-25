@@ -326,6 +326,7 @@ def process(
         nwbroot=nwbroot,
         packaging_format=packaging_format.lower(),
         imaging_data_format=imaging_data_format.lower(),
+        requires_mesoscaler=register_rois,
     )
     if paths is None:
         _logging.warning("unknown error: paths failed to be configured")
@@ -334,6 +335,9 @@ def process(
     if outfile.exists() and (not overwrite):
         _logging.warning(f"file already exists: '{outfile}'")
         return
+    elif paths.source.rawdata is None:
+        raise RuntimeError("failed to locate the raw data file")
+
     metadata = _file_metadata.read_recordings_metadata(
         paths.session,
         paths.source.rawdata,

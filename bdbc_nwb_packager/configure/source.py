@@ -180,11 +180,15 @@ def setup_source_paths(
     face_results_root: Optional[PathLike] = None,
     eye_results_root: Optional[PathLike] = None,
     pupilroot: Optional[PathLike] = None,
+    requires_mesoscaler: bool = True,
 ) -> SourcePaths:
     rawfile  = _sessx.locate_rawdata_file(session, rawroot)
     mesofile = _sessx.locate_mesoscaler_file(session, mesoroot=mesoroot)
     if (mesofile is None) or (not mesofile.exists()):
-        raise FileNotFoundError(str(mesofile))
+        if requires_mesoscaler:
+            raise FileNotFoundError(str(mesofile))
+        else:
+            _logging.warning(f"proceeding without a mesoscaler file: {mesofile}")
     sessvideos = _sessx.video_files_from_session(
         session,
         videoroot=videoroot,

@@ -97,6 +97,7 @@ def setup_path_settings(
     eyemodeldir: Optional[PathLike] = None,
     packaging_format: PackagingFormat = 'default',
     imaging_data_format: ImagingDataFormat = 'infer',
+    requires_mesoscaler: bool = True,
 ) -> Optional[PathSettings]:
     if not session.has_rawdata():
         return None
@@ -109,6 +110,7 @@ def setup_path_settings(
         face_results_root=face_results_root,
         eye_results_root=eye_results_root,
         pupilroot=pupilroot,
+        requires_mesoscaler=requires_mesoscaler,
     )
     dlc_configs = DLCModelConfigs.setup(
         bodymodeldir=bodymodeldir,
